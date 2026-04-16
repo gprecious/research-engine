@@ -1,0 +1,16 @@
+# superpowers brainstorm session files
+.superpowers/
+
+# research engine outputs and caches (may contain scraped content)
+research/*/cache/
+research/*/transcript.md
+
+# Node / Python / editors
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+.idea/
+.vscode/
