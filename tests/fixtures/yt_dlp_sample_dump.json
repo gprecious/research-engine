@@ -1,0 +1,15 @@
+{
+  "id": "dQw4w9WgXcQ",
+  "title": "Sample Video Title",
+  "description": "Sample description line 1.\nSample description line 2.",
+  "uploader": "Sample Channel",
+  "duration": 212,
+  "language": "en",
+  "chapters": [
+    {"title": "Intro", "start_time": 0, "end_time": 30},
+    {"title": "Main content", "start_time": 30, "end_time": 180},
+    {"title": "Outro", "start_time": 180, "end_time": 212}
+  ],
+  "subtitles": {"en": [{"ext": "vtt"}]},
+  "automatic_captions": {"ko": [{"ext": "vtt"}], "en": [{"ext": "vtt"}]}
+}
