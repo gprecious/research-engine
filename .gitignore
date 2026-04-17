@@ -1,9 +1,11 @@
 # superpowers brainstorm session files
 .superpowers/
 
-# research engine outputs and caches (may contain scraped content)
-research/*/cache/
-research/*/transcript.md
+# research outputs (acceptance runs and real usage both land here)
+research/
+
+# plugin install symlink artifacts
+install.log
 
 # Node / Python / editors
 node_modules/
