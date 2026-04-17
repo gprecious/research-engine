@@ -1,0 +1,18 @@
+https://www.youtube.com/watch?v=dQw4w9WgXcQ	youtube
+https://youtu.be/dQw4w9WgXcQ	youtube
+https://youtube.com/shorts/abc123	youtube
+https://arxiv.org/abs/2301.12345	arxiv
+https://arxiv.org/pdf/2301.12345.pdf	arxiv
+https://arxiv.org/abs/2301.12345v2	arxiv
+https://github.com/anthropics/claude-code	github
+https://github.com/anthropics/claude-code/issues/100	github
+https://github.com/anthropics/claude-code/pull/200	github
+https://huggingface.co/meta-llama/Llama-3-8B	huggingface
+https://huggingface.co/datasets/squad	huggingface
+https://news.ycombinator.com/item?id=39000000	community
+https://www.reddit.com/r/LocalLLaMA/comments/abc/xyz/	community
+https://lobste.rs/s/abcde/some_story	community
+https://engineering.example.com/posts/some-post	blog
+https://blog.example.io/some-post	blog
+best practices for RAG pipelines	topic
+MoE LLM trends 2026	topic
