@@ -138,6 +138,7 @@ Output lands in `research/YYYY-MM-DD-<slug>/README.md`.
 - `yt-dlp` in `PATH` (YouTube captions)
 - `gh` CLI authenticated (GitHub)
 - `jq` (JSON munging)
+- `perl` with UTF-8 (all Debian/Ubuntu systems ship this; used for Unicode-aware slugify)
 - Claude Code plugins: `firecrawl`, `context7`, `huggingface-skills`
 
 ## Docs
@@ -493,7 +494,8 @@ Create `scripts/slugify.sh`:
 ```bash
 #!/usr/bin/env bash
 # Lowercase, hyphenate whitespace, drop punctuation, cap at 40 chars.
-# Preserves non-ASCII letters (e.g. Hangul) so Korean titles are readable.
+# Preserves Unicode letters (Hangul, CJK, Hiragana, Katakana) so non-ASCII
+# titles remain readable.
 # Usage: slugify.sh <text>
 set -euo pipefail
 
@@ -502,15 +504,18 @@ if [[ $# -lt 1 || -z "${1:-}" ]]; then
   exit 2
 fi
 
-LC_ALL=C.UTF-8 printf '%s' "$1" \
-  | tr '[:upper:]' '[:lower:]' \
-  | sed -E 's/[^[:alnum:][:space:]가-힣ぁ-んァ-ヶ一-龥-]//g' \
-  | sed -E 's/[[:space:]_]+/-/g' \
-  | sed -E 's/-+/-/g' \
-  | sed -E 's/^-|-$//g' \
-  | cut -c 1-40 \
-  | sed -E 's/-+$//'
+printf '%s' "$1" | perl -CSDA -Mutf8 -pe '
+  $_ = lc $_;
+  s/[^\p{L}\p{N}\s_-]//g;
+  s/[\s_]+/-/g;
+  s/-+/-/g;
+  s/^-+|-+$//g;
+  $_ = substr($_, 0, 40);
+  s/-+$//;
+'
 ```
+
+**Why Perl:** GNU sed 4.9 on Debian/Ubuntu rejects multi-byte Unicode character ranges like `가-힣` inside bracket expressions, regardless of locale. Perl with `-CSDA -Mutf8` handles Unicode properties (`\p{L}` = any Unicode letter, `\p{N}` = number) correctly and is universally available. Test semantics are preserved.
 
 - [ ] **Step 4: Run tests, expect pass**
 
