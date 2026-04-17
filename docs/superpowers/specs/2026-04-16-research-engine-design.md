@@ -87,7 +87,7 @@
 - 프리뷰를 근거로 **동적 질문** 1~3개 생성. 예:
   - "영상이 A, B, C를 다루는 것 같은데 어느 쪽에 집중할까요?"
   - "학습용 / 의사결정 / 공유용 중 어느 쪽인가요?"
-- 사용자 응답을 **Intent 블록**으로 구조화 (`intent.purpose`, `intent.focus`, `intent.audience` 등).
+- 사용자 응답을 **Intent 블록**으로 구조화 (`intent.purpose`, `intent.focus`, `intent.audience_level` 등).
 
 `--yes` 일 때:
 - 엔진이 프리뷰만으로 Intent를 추정. 리포트의 Intent 섹션에 "추정(assumed)" 표시.

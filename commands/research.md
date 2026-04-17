@@ -14,7 +14,7 @@ allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Agent, WebFetch, WebSearch
 
 ## Constants
 
-- `PLUGIN_DIR` = the directory containing this command's plugin
+- `${CLAUDE_PLUGIN_ROOT}` = plugin root, exported by Claude Code into each Bash tool invocation for commands owned by this plugin.
 - `RESEARCH_DIR` = `<project_cwd>/research`
 - Date today: !`date -u +%Y-%m-%d`
 
@@ -24,20 +24,20 @@ Execute these stages **in order**. Do not skip stages.
 
 ### Stage 1 — Classify
 
-Run `bash "$PLUGIN_DIR/scripts/classify_url.sh" "<target>"`. Store the result as `input_type`.
+Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/classify_url.sh" "<target>"`. Store the result as `input_type`.
 
 ### Stage 2 — Preview
 
 Branch by `input_type`:
 
-- **youtube** → `bash "$PLUGIN_DIR/scripts/yt_fetch.sh" metadata "<target>"` → parse title/description/chapters/selected_caption_lang. Extract roughly the first 5 minutes of the selected-lang captions by running `yt_fetch.sh captions` into a temporary dir (or reading cached VTT if it exists).
+- **youtube** → Pre-flight: `command -v yt-dlp >/dev/null || { echo "yt-dlp not installed. Install with: pipx install yt-dlp  (or)  brew install yt-dlp" >&2; exit 1; }`. Then `bash "${CLAUDE_PLUGIN_ROOT}/scripts/yt_fetch.sh" metadata "<target>"` → parse title/description/chapters/selected_caption_lang. Extract roughly the first 5 minutes of the selected-lang captions by running `yt_fetch.sh captions` into a temporary dir (or reading cached VTT if it exists).
 - **arxiv** → invoke the `huggingface-skills:hugging-face-paper-pages` skill with the arXiv id to get title+abstract.
 - **github** → `gh repo view <owner>/<repo> --json ...` + first 2 KB of README.
 - **huggingface** → `hf` CLI card summary.
-- **blog / community** → `mcp firecrawl scrape` of the URL; take first 2 KB of markdown.
+- **blog / community** → invoke the `firecrawl:firecrawl-scrape` skill (or `firecrawl:firecrawl` for more complex crawls) on the URL; take first 2 KB of markdown.
 - **topic** → `WebSearch` with `<target>` and keep the top 5 result titles + snippets.
 
-Write the preview to `RESEARCH_DIR/<tmp-slug>/cache/preview-<cache_key>.json` (create dir if needed). Compute `cache_key` via `bash "$PLUGIN_DIR/scripts/cache_key.sh" "<target>"`.
+Write the preview to `RESEARCH_DIR/<tmp-slug>/cache/preview-<cache_key>.json` (create dir if needed). Compute `cache_key` via `bash "${CLAUDE_PLUGIN_ROOT}/scripts/cache_key.sh" "<target>"`.
 
 ### Stage 3 — Intent Q&A
 
@@ -86,7 +86,7 @@ Timeout per adapter: 5 minutes (configured implicitly by the agent runtime; do N
 
 ### Stage 5 — Synthesize & Persist
 
-1. Collect adapter outputs. Re-number source ids across adapters into a single zero-indexed list `[1]…[N]`.
+1. Collect adapter outputs. Re-number source ids across adapters into a single one-indexed list `[1]…[N]`.
 2. Write `<report_dir>/sources.json` as:
    ```json
    {

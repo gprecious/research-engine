@@ -14,7 +14,7 @@ allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Agent, WebFetch, WebSearch
 ## Resolve session
 
 - If `--slug` was provided, use it.
-- Else run `bash "$PLUGIN_DIR/scripts/find_latest_session.sh" "<project_cwd>/research"` and use that slug.
+- Else run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/find_latest_session.sh" "<project_cwd>/research"` and use that slug.
 - If no session exists, tell the user: "아직 리서치 세션이 없습니다. 먼저 `/research <target>`를 실행하세요." and stop.
 
 Let `<report_dir> = <project_cwd>/research/<slug>`.
