@@ -1,6 +1,6 @@
 ---
 description: Deep research on a URL (YouTube/arXiv/GitHub/blog/docs) or topic keyword. Produces research/YYYY-MM-DD-<slug>/README.md.
-argument-hint: <URL or topic> [--yes] [--fresh] [--slug <name>]
+argument-hint: "<URL or topic> [--yes] [--fresh] [--slug <name>]"
 allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Agent, WebFetch, WebSearch
 ---
 

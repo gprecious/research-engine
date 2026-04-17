@@ -1,6 +1,6 @@
 ---
 description: Follow up on the most recent research session (or a named one). Appends to research/<slug>/session.md.
-argument-hint: [question] [--slug <name>] [--fresh]
+argument-hint: "[question] [--slug <name>] [--fresh]"
 allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Agent, WebFetch, WebSearch
 ---
 
