@@ -4,11 +4,36 @@ Deep research via Claude Code slash commands. Give it a URL or a topic — it re
 
 ## Installation
 
+From the published marketplace (recommended):
+
 ```bash
-./install.sh            # symlinks to ~/.claude/plugins/research-engine
+claude plugin marketplace add gprecious/gprecious-marketplace   # one-time per machine
+claude plugin install research-engine@gprecious-marketplace
 ```
 
-Then restart Claude Code or run `/plugins reload`.
+Then restart Claude Code or run `/plugins reload`. Updates via `claude plugin update research-engine@gprecious-marketplace` once a new version is published.
+
+### Local development install (for contributors)
+
+Clone this repo, then register it as a local marketplace:
+
+```bash
+git clone https://github.com/gprecious/research-engine
+# Point a local marketplace at the repo
+mkdir -p research-engine-mp/.claude-plugin
+cat > research-engine-mp/.claude-plugin/marketplace.json <<JSON
+{
+  "\$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "research-engine-local", "version": "0.0.0",
+  "owner": { "name": "local-dev" },
+  "plugins": [{ "name": "research-engine", "source": "../research-engine", "category": "productivity" }]
+}
+JSON
+claude plugin marketplace add ./research-engine-mp
+claude plugin install research-engine@research-engine-local
+```
+
+Tip: once installed, replace the snapshot in `~/.claude/plugins/cache/research-engine-local/research-engine/<ver>/` with a symlink to your working copy so local edits reflect without a version bump.
 
 ## Usage
 

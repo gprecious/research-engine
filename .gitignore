@@ -4,9 +4,6 @@
 # research outputs (acceptance runs and real usage both land here)
 research/
 
-# plugin install symlink artifacts
-install.log
-
 # Node / Python / editors
 node_modules/
 __pycache__/
