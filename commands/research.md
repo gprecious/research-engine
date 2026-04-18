@@ -86,6 +86,8 @@ Timeout per adapter: 5 minutes (configured implicitly by the agent runtime; do N
 
 ### Stage 5 — Synthesize & Persist
 
+**⚠️ DO-NOT-SKIP CHECKLIST.** This stage has **8 numbered steps**. You MUST complete ALL of them before declaring Stage 5 done. Do NOT treat the Markdown file writes (steps 2–6) as "the whole stage" — steps 7 and 8 are mandatory side effects (Notion mirror + final user message format). Before marking Stage 5 complete, verify three artifacts exist: `sources.json` contains `output_notion_url`, `README.md` starts with a `> 📒 Notion:` line under the frontmatter, and your final user-facing message line includes the Notion URL.
+
 1. Collect adapter outputs. Re-number source ids across adapters into a single one-indexed list `[1]…[N]`.
 2. Write `<report_dir>/sources.json` as:
    ```json
