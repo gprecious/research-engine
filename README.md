@@ -23,11 +23,11 @@ Then restart Claude Code or run `/plugins reload`.
 /research-followup "..." --slug <name>    # target specific session
 ```
 
-Output lands in `research/YYYY-MM-DD-<slug>/README.md` and (when Notion is configured) mirrored to Notion at `<parent>/research-engine/<slug>/`.
+Output lands in `research/YYYY-MM-DD-<slug>/README.md`. When Notion is configured, a consolidated report is also upserted as a row in a `research-engine` database under the configured parent page (one row per session, re-runs update in place).
 
 ## Notion mirroring (optional one-time setup)
 
-When `NOTION_TOKEN` + `NOTION_PARENT_PAGE_ID` are set, every `/research` run auto-pushes the report as a Notion page tree (main + transcript + followups + related/*), with follow-ups idempotently appended.
+When `NOTION_TOKEN` + `NOTION_PARENT_PAGE_ID` are set, every `/research` run upserts a row in a `research-engine` database under the parent page. Each session is a single consolidated page whose body holds the main report plus collapsible toggles for transcript, followups, and related materials. Re-running the same session (e.g. via `/research-followup`) updates the row in place instead of duplicating.
 
 ```bash
 # 1. Create integration: https://www.notion.so/profile/integrations
