@@ -23,7 +23,26 @@ Then restart Claude Code or run `/plugins reload`.
 /research-followup "..." --slug <name>    # target specific session
 ```
 
-Output lands in `research/YYYY-MM-DD-<slug>/README.md`.
+Output lands in `research/YYYY-MM-DD-<slug>/README.md` and (when Notion is configured) mirrored to Notion at `<parent>/research-engine/<slug>/`.
+
+## Notion mirroring (optional one-time setup)
+
+When `NOTION_TOKEN` + `NOTION_PARENT_PAGE_ID` are set, every `/research` run auto-pushes the report as a Notion page tree (main + transcript + followups + related/*), with follow-ups idempotently appended.
+
+```bash
+# 1. Create integration: https://www.notion.so/profile/integrations
+#    Grant "Insert content" + "Update content".
+# 2. In Notion, share the parent page with the integration (••• → Add connection).
+# 3. Save credentials:
+mkdir -p ~/.config/research-engine
+cat > ~/.config/research-engine/notion.env <<'EOF'
+NOTION_TOKEN=secret_XXXX
+NOTION_PARENT_PAGE_ID=YOUR_PAGE_ID   # 32-char ID from the shared page URL
+EOF
+chmod 600 ~/.config/research-engine/notion.env
+```
+
+If not configured, `/research` silently skips the Notion step and continues with local markdown only.
 
 ## Requirements
 

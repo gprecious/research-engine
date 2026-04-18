@@ -59,6 +59,10 @@ Append (append-only, never rewrite prior entries):
 - [{{title}}]({{url}}) — <one-line why>
 ```
 
+## Push to Notion (mirror)
+
+If `NOTION_TOKEN` + `NOTION_PARENT_PAGE_ID` are configured (env or `~/.config/research-engine/notion.env`), run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/push_to_notion.sh" "<report_dir>"` after `session.md` is updated. The script idempotently syncs every sub-page — existing pages are reused by title, not duplicated.
+
 ## Report path
 
-Final message: one line with `<report_dir>/session.md` path.
+Final message: one line with `<report_dir>/session.md` path (plus Notion URL if pushed).
