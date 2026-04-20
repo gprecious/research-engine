@@ -11,6 +11,11 @@ sudo apt install -y bats   # one-time
 bats tests/bats/
 ```
 
+New bats files added in 0.3.0:
+- `tests/bats/test_load_session.bats`
+- `tests/bats/test_patch_readme.bats`
+- `tests/bats/test_render_chart.bats`
+
 ## Manual acceptance
 
 See `tests/acceptance/*.md` — each file is a checklist you step through in a fresh Claude Code session with the plugin installed.

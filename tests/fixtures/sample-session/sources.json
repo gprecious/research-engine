@@ -1,0 +1,10 @@
+{
+  "sources": [
+    { "n": 1, "adapter": "arxiv", "type": "arxiv-paper", "url": "https://example.com/a", "title": "Paper A", "meta": {}, "fetched_at": "2026-04-20T00:00:00Z" },
+    { "n": 2, "adapter": "arxiv", "type": "arxiv-paper", "url": "https://example.com/b", "title": "Paper B", "meta": {}, "fetched_at": "2026-04-20T00:00:00Z" }
+  ],
+  "intent": { "purpose": "학습", "focus": "벤치마크 비교", "audience_level": "초보" },
+  "input": "sample",
+  "input_type": "topic",
+  "created": "2026-04-20T00:00:00Z"
+}

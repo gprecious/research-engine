@@ -3,6 +3,22 @@
 All notable changes to research-engine.
 Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
+## 0.3.0 — 2026-04-20
+
+### Added
+- `/research-visualize <slug>` slash command — generates data charts (QuickChart PNG, default), optional Mermaid diagrams (`--diagrams`), and optional Marp slide decks (`--slides`) for an existing research session.
+- `lib/chart_spec_contract.md` — JSON schema for chart specs produced by the extractor subagent and consumed by `render_chart.sh`.
+- New subagents: `visualizer-extractor`, `visualizer-diagrammer`, `visualizer-deck`.
+- New scripts: `scripts/load_session.sh`, `scripts/render_chart.sh`, `scripts/render_slides.sh`, `scripts/patch_readme.sh`.
+- Bats tests: `test_load_session.bats`, `test_patch_readme.bats`, `test_render_chart.bats`.
+- `tests/fixtures/sample-session/` fixture for unit tests.
+- README viz block is idempotent (marker-bounded) so re-runs don't drift.
+- Notion: Mermaid diagrams added by `--diagrams` are mirrored automatically via existing markdown path in `push_to_notion.sh` (no scripts touched).
+
+### Notes
+- Chart PNG upload to Notion is deliberately out of scope for 0.3.0 (v2 follow-up).
+- `/research` main pipeline and adapter contract are unchanged.
+
 ## 0.2.0 — 2026-04-18
 
 ### Changed
