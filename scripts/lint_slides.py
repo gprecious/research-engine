@@ -209,6 +209,27 @@ def lint(md_text: str, sources_json_path: str | None = None) -> dict:
             "detail": f"{slide_count} slides (max {MAX_SLIDES})"
         })
 
+    # Pass 1 — build heading→slide-numbers index for duplicate detection.
+    heading_index: dict[str, list[int]] = {}
+    for idx, block in blocks:
+        klass = detect_layout_class(block)
+        # Don't flag duplicates on repetition-allowed classes.
+        # Divider/sources often reuse terse text intentionally.
+        if klass in {"divider", "divider-num", "sources", "title", "lead"}:
+            continue
+        _, heading = extract_first_heading(block)
+        if not heading:
+            continue
+        key = re.sub(r"\s+", " ", re.sub(r"[*`_]", "", heading)).strip().lower()
+        heading_index.setdefault(key, []).append(idx)
+    for key, slides in heading_index.items():
+        if len(slides) >= 2:
+            violations.append({
+                "slide": slides[0],
+                "rule": "heading_duplicated",
+                "detail": f"heading '{key}' appears on slides {slides}"
+            })
+
     body_pt = extract_body_font_pt(md_text)
     if body_pt is not None and body_pt < MIN_BODY_PT:
         violations.append({
@@ -229,6 +250,17 @@ def lint(md_text: str, sources_json_path: str | None = None) -> dict:
         klass = detect_layout_class(block)
         if klass:
             layout_classes.append(klass)
+
+        # `![bg fit]` is a Marp page-level background image directive that
+        # bypasses the section.chart-hero `img { width: 100% }` rule. Using it
+        # outside chart-hero creates inconsistent image sizing (flagged by the
+        # judge in run 1).
+        if re.search(r"!\[bg\s+fit\]", block) and klass != "chart-hero":
+            violations.append({
+                "slide": idx,
+                "rule": "bg_fit_outside_chart_hero",
+                "detail": f"![bg fit] on slide with class={klass!r} — only allowed in chart-hero"
+            })
 
         # Section-class exemptions — sources is intentionally dense (31-entry ref list).
         if klass == "sources":

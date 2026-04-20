@@ -3,6 +3,17 @@
 All notable changes to research-engine.
 Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
+## 0.7.1 — 2026-04-20
+
+### Added
+- Two new deterministic rules in `scripts/lint_slides.py`:
+  - `heading_duplicated` — same h2 appears on 2+ content slides. Divider / divider-num / sources / title / lead classes are exempt (terse repetition is intentional there).
+  - `bg_fit_outside_chart_hero` — Marp's `![bg fit]` page-background directive bypasses the `section.chart-hero img { width: 100% }` CSS rule, so using it outside a `chart-hero` slide creates inconsistent image sizing (judge flagged this in run 1).
+- 4 new bats tests covering both rules (positive + negative cases). Full suite 91/91.
+
+### Notes
+- Both rules are enforcement layers for structural consistency — the judge can now focus on subjective axes because these mechanical drift patterns are caught pre-dispatch.
+
 ## 0.7.0 — 2026-04-20
 
 ### Added

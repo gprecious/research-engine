@@ -319,6 +319,89 @@ EOF
   [[ "$output" != *"source_marker_unresolved"* ]]
 }
 
+@test "heading_duplicated: flags two content slides sharing the same h2" {
+  cat > "$SLIDES" <<'EOF'
+---
+marp: true
+---
+<style>section { font-size: 24pt; }</style>
+
+## 접근성은 숫자 린터로 강제한다
+
+- a [1]
+
+---
+
+## 다른 논리가 그 사이에 있다
+
+- b [1]
+
+---
+
+## 접근성은 숫자 린터로 강제한다
+
+- duplicate heading [1]
+EOF
+  run python3 "$SCRIPT" "$SLIDES"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"heading_duplicated"* ]]
+  [[ "$output" == *"접근성은 숫자 린터로 강제한다"* ]]
+}
+
+@test "heading_duplicated: divider and sources repeats are allowed (no flag)" {
+  cat > "$SLIDES" <<'EOF'
+---
+marp: true
+---
+<style>section { font-size: 24pt; } section.divider { background: #f0f; }</style>
+
+<!-- _class: divider -->
+# 핵심 3가지
+
+---
+
+<!-- _class: divider -->
+# 핵심 3가지
+EOF
+  run python3 "$SCRIPT" "$SLIDES"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"heading_duplicated"* ]]
+}
+
+@test "bg_fit_outside_chart_hero: flags ![bg fit] on a default slide" {
+  cat > "$SLIDES" <<'EOF'
+---
+marp: true
+---
+<style>section { font-size: 24pt; }</style>
+
+## 차트 비율이 어긋난다
+
+![bg fit](figures/chart.png)
+EOF
+  run python3 "$SCRIPT" "$SLIDES"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"bg_fit_outside_chart_hero"* ]]
+}
+
+@test "bg_fit_outside_chart_hero: allowed inside chart-hero" {
+  cat > "$SLIDES" <<'EOF'
+---
+marp: true
+---
+<style>section { font-size: 24pt; } section.chart-hero { padding: 48px; }</style>
+
+<!-- _class: chart-hero -->
+
+## 차트가 슬라이드를 채운다
+
+![bg fit](figures/chart.png)
+EOF
+  run python3 "$SCRIPT" "$SLIDES"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"bg_fit_outside_chart_hero"* ]]
+}
+
 @test "malformed sources.json becomes a warning, not a violation" {
   cat > "$SLIDES" <<'EOF'
 ---
