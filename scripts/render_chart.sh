@@ -66,6 +66,12 @@ if errors:
         print(e, file=sys.stderr)
     sys.exit(3)
 
+# Chart.js v4 expects datasets[].data (not .values). Our spec contract uses
+# .values for evidence-check clarity; remap here just before sending to QuickChart.
+for ds in datasets:
+    if "values" in ds:
+        ds["data"] = ds.pop("values")
+
 # Build Chart.js config.
 if kind == "horizontal_bar":
     cfg = { "type": "bar",

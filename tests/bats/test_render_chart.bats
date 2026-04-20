@@ -86,3 +86,23 @@ EOF
   run "$SCRIPT" --print-url "/nonexistent/spec.json"
   [ "$status" -ne 0 ]
 }
+
+@test "URL contains Chart.js-compatible datasets[].data (not .values)" {
+  # Regression test: Chart.js v4 requires datasets[].data, but our spec contract
+  # uses datasets[].values for evidence-check readability. render_chart.sh must
+  # rename before sending to QuickChart so the rendered PNG isn't blank.
+  valid_spec
+  run "$SCRIPT" --print-url "$SPEC"
+  [ "$status" -eq 0 ]
+  # Decode the URL and check the datasets key at the JSON level.
+  decoded="$(python3 -c 'import sys,urllib.parse; print(urllib.parse.unquote(sys.argv[1].split("c=")[1].split("&")[0]))' "$output")"
+  [[ "$decoded" == *'"data":'* || "$decoded" == *'"data": '* ]]
+  # The "values" key must NOT appear inside datasets[].
+  python3 -c '
+import json, sys
+cfg = json.loads(sys.argv[1])
+for ds in cfg["data"]["datasets"]:
+    assert "data" in ds, f"dataset missing data key: {ds}"
+    assert "values" not in ds, f"dataset still has values key: {ds}"
+' "$decoded"
+}

@@ -11,7 +11,7 @@ You are the **visualizer-deck**. Given a completed research session's README + s
 A JSON object with:
 - `readme` — full README.md.
 - `sources` — array from sources.json.
-- `charts` — array of `{ id, title, png_rel_path }` for already-rendered charts (rel path from slides.md, i.e., `figures/chart-01-<slug>.png`).
+- `charts` — array of `{ id, title, png_rel }` for already-rendered charts (rel path from slides.md, i.e., `figures/chart-01-<slug>.png`).
 - `diagrams` — array of `{ id, title, mermaid }` (may be empty if `--diagrams` not passed).
 - `slug`, `report_title`, `iso_date`.
 
@@ -25,7 +25,7 @@ Emit the **full contents of slides.md** as a single fenced code block with langu
 2. **TL;DR slide** — extract 3–5 bullets from the README's §요약 (TL;DR).
 3. **핵심 포인트 slides** — 1 to 3 slides, ≤ 6 bullets each, drawn from §핵심 포인트.
 4. **Section summary slides** — up to 10 slides, one per subsection of §상세 분석. Title = subsection heading. Body = 2–4 bullets.
-5. **Chart slides** — one slide per entry in `charts`: use `![bg fit]({{png_rel_path}})` so the image fills the slide. Put the chart title as a bottom caption via `<!-- _footer: ... -->` Marp directive.
+5. **Chart slides** — one slide per entry in `charts`: use `![bg fit]({{png_rel}})` so the image fills the slide. Put the chart title as a bottom caption via `<!-- _footer: ... -->` Marp directive.
 6. **Diagram slides** — one per entry in `diagrams`: render the mermaid inside a fenced ` ```mermaid ` block.
 7. **Sources slide** — numbered list from `sources` (title — url).
 
