@@ -37,6 +37,7 @@ Pre-req: plugin installed locally, an existing research session under `research/
 - [ ] With `NOTION_TOKEN` + `NOTION_PARENT_PAGE_ID` configured, `/research-visualize <slug>` auto-pushes the updated README to Notion at the final stage. Stdout shows a `📒 Notion: <url>` line.
 - [ ] After `--diagrams`, Notion page body shows the newly added Mermaid blocks (rendered natively).
 - [ ] Chart PNG references (`![](figures/...)`) render as Notion image blocks (image visible inline, caption = alt text). The image is served from QuickChart via the URL stored in `figures/chart-*.meta.json`.
+- [ ] With `--slides`, `slides.pptx` and `slides.pdf` are uploaded to Notion via the file_uploads API and appear under "📎 슬라이드 덱". Clicking the block downloads the file. Files ≤ 20MB; larger ones are skipped with a warning line on stderr.
 - [ ] `/research-visualize <slug> --no-sync-notion` skips the Notion push; final stdout omits the Notion line.
 - [ ] Without Notion env configured, a single log line is printed (`viz: Notion env not configured — skipping push`) and the command still exits 0.
 

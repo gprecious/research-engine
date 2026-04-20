@@ -15,7 +15,9 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 - README viz block is idempotent (marker-bounded) so re-runs don't drift.
 - Notion: `/research-visualize` now auto-pushes the patched README to Notion by default. Pass `--no-sync-notion` to opt out.
 - Notion: chart PNGs referenced as `![](figures/chart-NN-*.png)` are mirrored as Notion `image` blocks backed by the QuickChart URL stored in each chart's `.meta.json` — no file upload, no external host needed. Mermaid blocks continue to render natively.
-- `scripts/push_to_notion.sh`: `md_to_blocks` parser extended with `NOTION_MD_BASE_DIR`-aware image resolution (local PNG + adjacent `.meta.json` → external image block).
+- Notion: `slides.pptx` and `slides.pdf` produced by `--slides` are uploaded to Notion via the `file_uploads` API and embedded under a "📎 슬라이드 덱" heading (single-part, up to 20MB each; larger files are skipped with a warning).
+- `scripts/push_to_notion.sh`: `md_to_blocks` parser extended with `NOTION_MD_BASE_DIR`-aware image resolution; new `notion_upload_file` helper wraps the two-step create-and-send file upload flow.
+- Chart color palette: `scripts/render_chart.sh` now applies an Okabe-Ito qualitative palette — distinct colors per dataset (bar/line/scatter/horizontal_bar) and per slice (pie). Bars/lines are no longer grey-on-grey.
 
 ### Notes
 - `/research` main pipeline and adapter contract are unchanged.

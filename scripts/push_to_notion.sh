@@ -94,6 +94,50 @@ _api() {
   fi
 }
 
+# Upload a single local file to Notion via the file_uploads API (single_part
+# mode, max 20MB). Echo the resulting file_upload id on stdout; empty on failure.
+# Usage: notion_upload_file <local_path> <filename> <content_type>
+NOTION_UPLOAD_VERSION="${NOTION_UPLOAD_VERSION:-2025-09-03}"
+notion_upload_file() {
+  local path="$1" filename="$2" ctype="$3"
+  [[ -f "$path" ]] || { echo "notion_upload_file: not a file: $path" >&2; return 1; }
+  local size
+  size="$(stat -c%s "$path" 2>/dev/null || stat -f%z "$path" 2>/dev/null)"
+  if (( size > 20 * 1024 * 1024 )); then
+    echo "notion_upload_file: $filename is ${size} bytes (>20MB single-part limit); skipping" >&2
+    return 1
+  fi
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    echo "[DRY] POST /file_uploads + send $filename ($size bytes)" >&2
+    echo "dry-run-file-upload-id"
+    return 0
+  fi
+  local create_body create_resp upload_id upload_url send_resp
+  create_body="$(jq -n --arg fn "$filename" --arg ct "$ctype" '{mode: "single_part", filename: $fn, content_type: $ct}')"
+  create_resp="$(curl -sS -X POST "${NOTION_API}/file_uploads" \
+    -H "Authorization: Bearer ${NOTION_TOKEN}" \
+    -H "Notion-Version: ${NOTION_UPLOAD_VERSION}" \
+    -H "Content-Type: application/json" \
+    --data-binary "$create_body")"
+  upload_id="$(jq -r '.id // empty' <<< "$create_resp")"
+  upload_url="$(jq -r '.upload_url // empty' <<< "$create_resp")"
+  if [[ -z "$upload_id" || -z "$upload_url" ]]; then
+    echo "notion_upload_file: create_file_upload failed for $filename: $create_resp" >&2
+    return 1
+  fi
+  send_resp="$(curl -sS -X POST "$upload_url" \
+    -H "Authorization: Bearer ${NOTION_TOKEN}" \
+    -H "Notion-Version: ${NOTION_UPLOAD_VERSION}" \
+    -F "file=@${path};type=${ctype};filename=${filename}")"
+  local status
+  status="$(jq -r '.status // empty' <<< "$send_resp")"
+  if [[ "$status" != "uploaded" ]]; then
+    echo "notion_upload_file: send bytes failed for $filename: $send_resp" >&2
+    return 1
+  fi
+  echo "$upload_id"
+}
+
 # ----- Markdown → Notion blocks (python helper, shared) -----
 # Python source is stored in a variable so `python3 -c` can execute it while
 # keeping stdin free for the markdown input. An inline `python3 - <<PYEOF`
@@ -443,6 +487,45 @@ fi
 
 # ----- Build consolidated body -----
 BODY_BLOCKS="$(NOTION_MD_BASE_DIR="$REPORT_DIR" md_to_blocks < "$REPORT_DIR/README.md" 2>/dev/null || echo '[]')"
+
+# Attach slide deck artifacts produced by /research-visualize --slides.
+# Upload .pptx and .pdf via the file_uploads API and append as file blocks
+# under a "📎 슬라이드 덱" heading.
+SLIDE_BLOCKS='[]'
+add_slide_block() {
+  local path="$1" filename="$2" ctype="$3" label="$4"
+  [[ -f "$path" ]] || return 0
+  echo "push_to_notion: uploading $filename → Notion..." >&2
+  local upload_id
+  upload_id="$(notion_upload_file "$path" "$filename" "$ctype")" || return 0
+  [[ -n "$upload_id" ]] || return 0
+  local blk
+  blk="$(jq -n --arg id "$upload_id" --arg cap "$label" '{
+    object: "block",
+    type: "file",
+    file: {
+      type: "file_upload",
+      file_upload: { id: $id },
+      caption: [{ type: "text", text: { content: $cap } }]
+    }
+  }')"
+  SLIDE_BLOCKS="$(jq --argjson b "$blk" '. + [$b]' <<< "$SLIDE_BLOCKS")"
+}
+
+add_slide_block "$REPORT_DIR/slides.pptx" "${SLUG}.pptx" \
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation" \
+  "PowerPoint / Keynote 편집용"
+add_slide_block "$REPORT_DIR/slides.pdf" "${SLUG}.pdf" \
+  "application/pdf" \
+  "빠른 미리보기용 PDF"
+
+if [[ "$(jq 'length' <<< "$SLIDE_BLOCKS")" != "0" ]]; then
+  BODY_BLOCKS="$(jq --argjson slides "$SLIDE_BLOCKS" -n --argjson b "$BODY_BLOCKS" '
+    $b + [
+      { "object":"block","type":"divider","divider":{} },
+      { "object":"block","type":"heading_2","heading_2":{"rich_text":[{"type":"text","text":{"content":"📎 슬라이드 덱"}}]} }
+    ] + $slides')"
+fi
 
 # Divider + "부속 자료" heading before the toggles (if any attachment exists)
 HAS_ATTACH=0
