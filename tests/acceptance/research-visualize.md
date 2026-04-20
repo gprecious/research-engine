@@ -32,10 +32,13 @@ Pre-req: plugin installed locally, an existing research session under `research/
 
 - [ ] `/research-visualize <slug> --fresh` overwrites `figures/`, regenerates PNGs (new `rendered_at`), replaces README block contents.
 
-## 6. Notion mirroring
+## 6. Notion mirroring (auto-push default)
 
-- [ ] After `--diagrams`, running `bash scripts/push_to_notion.sh research/<slug>` mirrors the Mermaid blocks into the Notion page (visible as rendered Mermaid in Notion).
+- [ ] With `NOTION_TOKEN` + `NOTION_PARENT_PAGE_ID` configured, `/research-visualize <slug>` auto-pushes the updated README to Notion at the final stage. Stdout shows a `📒 Notion: <url>` line.
+- [ ] After `--diagrams`, Notion page body shows the newly added Mermaid blocks (rendered natively).
 - [ ] Chart PNG references (`![](figures/...)`) in README are not visible in Notion (expected — v1 limitation; page remains clean, no broken links).
+- [ ] `/research-visualize <slug> --no-sync-notion` skips the Notion push; final stdout omits the Notion line.
+- [ ] Without Notion env configured, a single log line is printed (`viz: Notion env not configured — skipping push`) and the command still exits 0.
 
 ## 7. Session missing
 

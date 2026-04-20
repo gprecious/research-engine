@@ -47,9 +47,10 @@ Tip: once installed, replace the snapshot in `~/.claude/plugins/cache/research-e
 /research-followup "저자 배경 더"         # ask follow-up on latest session
 /research-followup "..." --slug <name>    # target specific session
 
-/research-visualize <slug>                # generate data charts in README
+/research-visualize <slug>                # charts + Notion auto-push
 /research-visualize <slug> --diagrams     # + Mermaid diagrams
 /research-visualize <slug> --slides       # + Marp slide deck (.pptx/.pdf)
+/research-visualize <slug> --no-sync-notion  # skip Notion push
 /research-visualize                        # use most recent session
 ```
 
@@ -78,7 +79,7 @@ If not configured, `/research` silently skips the Notion step and continues with
 
 `/research-visualize <slug>` post-processes a completed session into data charts (QuickChart PNG, default), Mermaid diagrams (`--diagrams`), and Marp slide decks (`--slides`). Outputs land under `research/<slug>/figures/` and `research/<slug>/slides.*`. The README gains a `<!-- viz:begin --> ... <!-- viz:end -->` block that's safe to re-run (idempotent).
 
-Mermaid diagrams are mirrored to Notion automatically by `push_to_notion.sh` (they're plain markdown). Chart PNGs are local-only in this version — run `push_to_notion.sh` again after `/research-visualize` to re-sync the Mermaid text.
+When Notion is configured, the final stage auto-pushes the patched README back to Notion (mirroring Mermaid blocks natively; chart `![](figures/...)` references are ignored by the existing `md_to_blocks` parser, so the Notion page stays clean). Pass `--no-sync-notion` to skip.
 
 ## Requirements
 

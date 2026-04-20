@@ -1,6 +1,6 @@
 ---
 description: Generate charts, optional Mermaid diagrams, and optional Marp slides for an existing research session.
-argument-hint: "[<slug>] [--slides] [--diagrams] [--fresh]"
+argument-hint: "[<slug>] [--slides] [--diagrams] [--fresh] [--no-sync-notion]"
 allowed-tools: Bash, Read, Write, Edit, Agent, Glob, Grep
 ---
 
@@ -11,6 +11,7 @@ allowed-tools: Bash, Read, Write, Edit, Agent, Glob, Grep
 - `--slides` — also generate `slides.md` + `.pptx` + `.pdf`
 - `--diagrams` — also generate Mermaid diagrams in the README viz block
 - `--fresh` — wipe and regenerate `figures/`, `slides.*`, and replace the README viz block
+- `--no-sync-notion` — skip the auto-push to Notion at the end of the pipeline
 
 ## Constants
 
@@ -122,14 +123,21 @@ Write `$report_dir/viz.json`:
 }
 ```
 
-### Stage V8 — Final message
+### Stage V8 — Sync to Notion (default on)
 
-Print a two-line summary:
+Unless `--no-sync-notion` was passed:
+
+- If `NOTION_TOKEN` and `NOTION_PARENT_PAGE_ID` are set (env or `~/.config/research-engine/notion.env`), run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/push_to_notion.sh" "$report_dir"`. This re-syncs the Notion row's body with the now-patched `README.md` (Mermaid blocks rendered natively; chart `![](figures/...)` references are ignored by the existing `md_to_blocks` parser, so the Notion page stays clean).
+- If the env vars are missing, log one line (`viz: Notion env not configured — skipping push`) and continue.
+- On push failure, record `{error: "notion_push_failed"}` in `viz.json.failures[]` but do not abort — the local artifacts are authoritative.
+
+### Stage V9 — Final message
+
+Print a two- or three-line summary:
 
 - Line 1: paths (README.md, any generated `slides.*`, count of figures).
 - Line 2: `viz.json` path + failure count (or "no failures").
-
-Do NOT push to Notion automatically. Mention to the user if Mermaid was added: "Run `bash scripts/push_to_notion.sh <report_dir>` to mirror the new diagrams to Notion."
+- Line 3 (when pushed): `📒 Notion: <url>` from `sources.json.output_notion_url`.
 
 ## Idempotency
 

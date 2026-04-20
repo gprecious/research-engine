@@ -13,7 +13,7 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 - Bats tests: `test_load_session.bats`, `test_patch_readme.bats`, `test_render_chart.bats`.
 - `tests/fixtures/sample-session/` fixture for unit tests.
 - README viz block is idempotent (marker-bounded) so re-runs don't drift.
-- Notion: Mermaid diagrams added by `--diagrams` are mirrored automatically via existing markdown path in `push_to_notion.sh` (no scripts touched).
+- Notion: `/research-visualize` now auto-pushes the patched README to Notion by default (Mermaid blocks rendered natively; chart `![](figures/...)` references are ignored by the parser so the page stays clean). Pass `--no-sync-notion` to opt out.
 
 ### Notes
 - Chart PNG upload to Notion is deliberately out of scope for 0.3.0 (v2 follow-up).
