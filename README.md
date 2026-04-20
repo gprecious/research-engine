@@ -47,11 +47,14 @@ Tip: once installed, replace the snapshot in `~/.claude/plugins/cache/research-e
 /research-followup "저자 배경 더"         # ask follow-up on latest session
 /research-followup "..." --slug <name>    # target specific session
 
-/research-visualize <slug>                # charts + Notion auto-push
-/research-visualize <slug> --diagrams     # + Mermaid diagrams
-/research-visualize <slug> --slides       # + Marp slide deck (.pptx/.pdf)
-/research-visualize <slug> --no-sync-notion  # skip Notion push
-/research-visualize                        # use most recent session
+/research-visualize <slug>                                 # charts + Notion auto-push
+/research-visualize <slug> --diagrams                      # + Mermaid diagrams (preset-themed when --preset set)
+/research-visualize <slug> --slides                        # + Marp slide deck (.pptx/.pdf)
+/research-visualize <slug> --slides --judge                # + 4-axis rubric auto-refine <75 (2-pass cap)
+/research-visualize <slug> --slides --preset dark-neon     # force preset (chart + deck + diagram share it)
+/research-visualize <slug> --slides --brand-image <url>    # watermark chart background via QuickChart plugin
+/research-visualize <slug> --no-sync-notion                # skip Notion push
+/research-visualize                                         # use most recent session
 ```
 
 Output lands in `research/YYYY-MM-DD-<slug>/README.md`. When Notion is configured, a consolidated report is also upserted as a row in a `research-engine` database under the configured parent page (one row per session, re-runs update in place).
@@ -78,6 +81,20 @@ If not configured, `/research` silently skips the Notion step and continues with
 ## Visualization (optional)
 
 `/research-visualize <slug>` post-processes a completed session into data charts (QuickChart PNG, default), Mermaid diagrams (`--diagrams`), and Marp slide decks (`--slides`). Outputs land under `research/<slug>/figures/` and `research/<slug>/slides.*`. The README gains a `<!-- viz:begin --> ... <!-- viz:end -->` block that's safe to re-run (idempotent).
+
+### Design pipeline (0.4.0+)
+
+Five named style presets live in [`lib/presets.json`](lib/presets.json) — `dark-neon`, `editorial-serif`, `minimal-swiss`, `warm-neutral-teal`, `bold-geometric`. When `--slides` is used, a deterministic [`scripts/pick_preset.py`](scripts/pick_preset.py) chooses one from the README content (override with `--preset <name>`), and that single preset is forwarded to **both** chart rendering (palette/bg/text color) AND the deck agent (Marp `<style>` block + layout classes), so the two stay visually consistent end-to-end.
+
+The deck agent enforces **assertion-evidence headings** ("Q3 revenue grew 23%" — not "Sales Overview"), hard limits (≤70 words/slide, ≤6 bullets/slide, ≤25 slides, body ≥24pt, ≤2 font families), and a 6-class layout system (`title` / `lead` / `divider` / `divider-num` / `bento` / `chart-hero` / `sources`). `scripts/lint_slides.py` runs post-render to catch mechanical violations (including unresolved `[n]` citations against `sources.json`).
+
+`--judge` adds a separate `visualizer-judge` agent that scores the deck 0–100 on Anthropic's 4-axis rubric (Design Quality / Originality / Craft / Functionality, per the [harness-design](https://www.anthropic.com/engineering/harness-design-long-running-apps) post). If <75, the deck agent regenerates with the fix-list (2-pass cap). Scores and fix-lists are persisted to `judge.json` alongside the deck.
+
+`--brand-image <url>` injects QuickChart's [`backgroundImageUrl`](https://quickchart.io/documentation/add-watermark/) plugin so every chart renders over a brand/watermark background. When an encoded Chart.js config exceeds ~1900 chars, `render_chart.sh` auto-switches to POST `/chart` so oversized configs stop failing on GET URL length.
+
+Completed reference decks are curated under [`examples/`](examples/) — the deck agent reads one matching example at the start of every generation (progressive-disclosure pattern). Contribute via `/research-visualize --slides --judge --preset <name>` on a real session and promoting the result if judge ≥90.
+
+### Notion sync
 
 When Notion is configured, the final stage auto-pushes the patched README back to Notion. Chart PNGs are mirrored as Notion image blocks backed by their QuickChart URLs (the URL is stored in each chart's `.meta.json` and reused, so no file upload is needed). Mermaid blocks render natively. `slides.pptx` and `slides.pdf` (when produced via `--slides`) are uploaded to Notion and embedded as file blocks under a "📎 슬라이드 덱" heading. Pass `--no-sync-notion` to skip.
 

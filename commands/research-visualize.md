@@ -67,7 +67,7 @@ Parse the first fenced JSON block from the reply with `jq`. Extract `charts[]` a
 
 ### Stage V4 — Extract diagrams (only with --diagrams)
 
-Dispatch `agents/visualizer-diagrammer.md`. Parse `diagrams[]`. Keep the raw mermaid text in memory for the patch step.
+Dispatch `agents/visualizer-diagrammer.md` with inputs `{readme, sources, slug, report_dir, style_preset: "<resolved_preset>"}` — the resolved preset from Stage V5 (or, if Stage V5 hasn't resolved it yet, run `pick_preset.py` here as a one-shot) so Mermaid diagrams visually match the deck palette. Parse `diagrams[]`. Keep the raw mermaid text in memory for the patch step.
 
 ### Stage V5 — Build slide deck (only with --slides)
 

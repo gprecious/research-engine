@@ -3,6 +3,21 @@
 All notable changes to research-engine.
 Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
+## 0.8.0 — 2026-04-20
+
+### Added
+- `agents/visualizer-diagrammer.md` now accepts an optional `style_preset` input. When set, the agent prepends a Mermaid `%%{init: {'theme':'base', 'themeVariables': {...}}}%%` directive to every diagram so the rendered SVG palette matches the deck (backgrounds, primary color, line color, accent). Token tables for all 5 presets are in the agent spec.
+- `commands/research-visualize.md` Stage V4 forwards the resolved preset to the diagrammer, so charts + deck + diagrams all share the same palette end-to-end.
+- Second curated reference deck: `examples/minimal-swiss-research.md` — same 31-source research content as the dark-neon example, rendered in Swiss-minimal discipline (single Inter family 300/800, 64×56 dense padding, red accent bar on dividers). Linter-clean, 0 violations. Shows how the same content flexes across presets.
+- Top-level `README.md` now documents the 0.4–0.7 feature set: 5 presets + deterministic picker, `--judge` / `--preset` / `--brand-image` flags, chart-deck palette sharing, linter rules, assertion-evidence discipline, 6-class layout system, `examples/` curation pattern.
+
+### Changed
+- `examples/dark-neon-dashboard.md` promoted from the v2 snapshot to the v3 (post-fixes) deck — now demonstrates `divider-num` 200pt numerals, 4-bullet bento discipline, and the formalized `section.sources` class.
+
+### Notes
+- Decided out-of-scope for this sprint: **backend dispatcher** (python-pptx for editable charts) — requires adding `python-pptx` as a runtime dependency; deferred until explicit user approval. **Playwright overflow QA** — same story (Playwright npm dep). The deterministic linter covers ~80% of what Playwright would catch without the dependency.
+- 91/91 tests still pass — this release is additive content (agent spec + examples + README), no behavior changes outside diagrammer's new optional input.
+
 ## 0.7.1 — 2026-04-20
 
 ### Added
