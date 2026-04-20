@@ -3,6 +3,18 @@
 All notable changes to research-engine.
 Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
+## 0.8.1 — 2026-04-20
+
+### Added
+- Three more curated reference decks fill the `examples/` gap — all 5 presets now have a first-pass reference:
+  - `examples/editorial-serif-research.md` — DM Serif Display + DM Sans on wax-paper, terracotta `::after` underline accent, forest-green em italics. Magazine feel for long-form reflective content. Linter-clean.
+  - `examples/warm-neutral-teal-research.md` — Fraunces + Inter on warm `#F5EFE4`, teal used **as gentle highlight only** (not flood), warm-brown divider structural bar. Linter-clean.
+  - `examples/bold-geometric-research.md` — Archivo Black 900 + Archivo 400 on near-black, 104–112pt title/divider type, yellow divider background with inverse black text. Linter-clean (one slide uses 6 bullets, below the universal hard cap but mildly over the airy density rule — documented as a known relaxation).
+- `examples/README.md` now documents "distinct content modes" as the criterion for future additions, since all 5 presets are covered.
+
+### Notes
+- Dispatched three `visualizer-deck` agents in parallel (one per preset) on the same source research content so reviewers can see how the **same argument** flexes across visual systems. Each deck independently chose compatible typographic devices (underline vs numeral vs left-accent bar) without the orchestrator enforcing them.
+
 ## 0.8.0 — 2026-04-20
 
 ### Added
