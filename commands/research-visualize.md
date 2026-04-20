@@ -1,6 +1,6 @@
 ---
 description: Generate charts, optional Mermaid diagrams, and optional Marp slides for an existing research session.
-argument-hint: "[<slug>] [--slides] [--diagrams] [--judge] [--preset <name>] [--fresh] [--no-sync-notion]"
+argument-hint: "[<slug>] [--slides] [--diagrams] [--judge] [--preset <name>] [--brand-image <url>] [--fresh] [--no-sync-notion]"
 allowed-tools: Bash, Read, Write, Edit, Agent, Glob, Grep
 ---
 
@@ -12,6 +12,7 @@ allowed-tools: Bash, Read, Write, Edit, Agent, Glob, Grep
 - `--diagrams` — also generate Mermaid diagrams in the README viz block
 - `--judge` — after building slides, score the deck against the 4-axis rubric and, if <75, automatically regenerate once applying the judge's fix-list (requires `--slides`)
 - `--preset <name>` — force both charts and deck to use one of the 5 named style presets from `lib/style_presets.md` (`dark-neon` / `editorial-serif` / `minimal-swiss` / `warm-neutral-teal` / `bold-geometric`). Without the flag, charts render on white + Okabe-Ito and the deck agent infers its own preset — which can visually disagree with the charts.
+- `--brand-image <url>` — forwarded to `render_chart.sh --brand-image`. Injects QuickChart's `backgroundImageUrl` plugin so every chart is rendered on top of the supplied watermark/brand image. URL must be publicly reachable by QuickChart.
 - `--fresh` — wipe and regenerate `figures/`, `slides.*`, and replace the README viz block
 - `--no-sync-notion` — skip the auto-push to Notion at the end of the pipeline
 
@@ -59,7 +60,7 @@ Parse the first fenced JSON block from the reply with `jq`. Extract `charts[]` a
 
 1. Compute `NN` (zero-padded index 01..05) and `<short>` = `bash "${CLAUDE_PLUGIN_ROOT}/scripts/slugify.sh" "<chart.title>"` (slugify.sh caps at 40 chars — fine).
 2. Write the spec JSON to a tempfile via `mktemp`.
-3. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/render_chart.sh" [--preset "$preset"] "$tempfile" "$report_dir/figures/chart-NN-<short>.png"`. If `--preset <name>` was passed on the command, forward it here so charts match the deck. This call both fetches the PNG and writes the adjacent `chart-NN-<short>.meta.json` (which preserves the spec + chosen preset for reproducibility).
+3. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/render_chart.sh" [--preset "$preset"] [--brand-image "$brand_image"] "$tempfile" "$report_dir/figures/chart-NN-<short>.png"`. Forward `--preset` and `--brand-image` when the command flags are set. Render automatically switches to POST /chart when the encoded Chart.js config exceeds ~1900 chars. This call both fetches the PNG and writes the adjacent `chart-NN-<short>.meta.json` (which preserves the spec, chosen preset, brand image, and render method for reproducibility).
 4. Delete the tempfile.
 5. On success: record `{id, title, png_rel: "figures/chart-NN-<short>.png"}` into `charts_rendered[]` and read `source_ids` from the just-written meta.json.
 6. On failure (non-zero exit from render_chart.sh): append `{chart_id, error}` to `failures_charts[]` and continue.
@@ -130,7 +131,7 @@ Write `$report_dir/viz.json`:
 {
   "slug": "...",
   "generated_at": "<ISO>",
-  "flags": { "slides": true, "diagrams": false, "judge": false, "preset": "dark-neon|null", "fresh": false },
+  "flags": { "slides": true, "diagrams": false, "judge": false, "preset": "dark-neon|null", "brand_image": "url|null", "fresh": false },
   "charts": [ { "id": "c1", "title": "...", "png_rel": "figures/..." } ],
   "diagrams": [ { "id": "d1", "title": "...", "placement": "...", "evidence_src_ids": [1,2] } ],
   "slides": { "md": "slides.md", "pptx": "slides.pptx|null", "pdf": "slides.pdf|null" },

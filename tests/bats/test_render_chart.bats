@@ -153,6 +153,48 @@ assert len(set(colors)) == len(colors), f"duplicate colors across datasets: {col
   [[ "$output" == *"backgroundColor=white"* ]]
 }
 
+@test "--brand-image injects backgroundImageUrl into chart config" {
+  valid_spec
+  run "$SCRIPT" --brand-image "https://example.com/logo.png" --print-url "$SPEC"
+  [ "$status" -eq 0 ]
+  # The plugin key + URL must round-trip into the URL-encoded chart config.
+  [[ "$output" == *"backgroundImageUrl"* ]]
+  [[ "$output" == *"example.com%2Flogo.png"* ]]
+}
+
+@test "small configs use GET (print-url starts with https://quickchart.io/chart?c=)" {
+  valid_spec
+  run "$SCRIPT" --print-url "$SPEC"
+  [ "$status" -eq 0 ]
+  [[ "$output" == https://quickchart.io/chart?c=* ]]
+}
+
+@test "oversized config auto-switches to POST (print-url is bare endpoint, no ?c=)" {
+  # Build a spec with many categories + values so the encoded config exceeds 1900 chars.
+  python3 - "$SPEC" <<'PY'
+import json, sys
+n = 300
+labels = [f"점{i:04d}-가나다라마바사" for i in range(n)]  # Korean fattens the encoded form
+values = [round(i * 0.37 + 0.5, 2) for i in range(n)]
+# Build evidence that mentions every value verbatim to pass the extractor guard.
+quote = " ".join(f"{v}" for v in values)
+spec = {
+    "id": "big",
+    "title": "Oversized chart",
+    "kind": "bar",
+    "data": { "labels": labels, "datasets": [ { "label": "y", "values": values } ] },
+    "evidence": [ { "source_id": 1, "quote_verbatim": quote } ],
+    "axis": { "x": "x", "y": "y" }
+}
+with open(sys.argv[1], "w", encoding="utf-8") as f:
+    json.dump(spec, f, ensure_ascii=False)
+PY
+  run "$SCRIPT" --print-url "$SPEC"
+  [ "$status" -eq 0 ]
+  # POST path prints the bare endpoint without the ?c= query string.
+  [ "$output" = "https://quickchart.io/chart" ]
+}
+
 @test "pie chart receives per-slice backgroundColor array" {
   cat > "$SPEC" <<'EOF'
 { "id": "cp", "title": "pie test", "kind": "pie",

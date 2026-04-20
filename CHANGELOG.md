@@ -3,6 +3,17 @@
 All notable changes to research-engine.
 Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
+## 0.5.0 — 2026-04-20
+
+### Added
+- `scripts/render_chart.sh --brand-image <url>` — injects QuickChart's `backgroundImageUrl` plugin so every chart renders over a watermark/brand background. Forwarded by the `/research-visualize --brand-image <url>` flag so whole decks can be brand-stamped in one pass.
+- QuickChart **POST /chart** auto-switch — when the encoded Chart.js config exceeds ~1900 chars (GET URL length limit), the script now falls back to POST with a JSON body instead of failing with URL-too-long. Small configs keep the GET path so `meta.json.quickchart_url` remains embeddable in Notion.
+- `chart.meta.json` gains `render_method` (`"GET"` or `"POST"`) and `brand_image` fields. For POST renders, `quickchart_url` is `null` — the Notion push code already skips image blocks when the URL is missing, so the locally-rendered PNG stays authoritative.
+- Three new bats tests in `tests/bats/test_render_chart.bats` covering `--brand-image` injection, the GET path for small configs, and the POST auto-switch for oversized configs (58/58 overall).
+
+### Notes
+- `/research-visualize --preset` + `--brand-image` can now produce an in-brand deck without any per-chart manual work. For example: `/research-visualize <slug> --slides --preset dark-neon --brand-image https://example.com/brand-mark-dark.png`.
+
 ## 0.4.0 — 2026-04-20
 
 ### Added

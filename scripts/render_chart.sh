@@ -2,22 +2,34 @@
 # Render a chart-spec JSON via QuickChart.io.
 #
 # Usage:
-#   render_chart.sh [--preset <name>] <spec.json> <out.png>   # fetch PNG + meta
-#   render_chart.sh [--preset <name>] --print-url <spec.json> # print URL only
+#   render_chart.sh [--preset <name>] [--brand-image <url>] <spec.json> <out.png>
+#   render_chart.sh [--preset <name>] [--brand-image <url>] --print-url <spec.json>
 #
 # --preset aligns chart colors with one of the 5 deck presets from
 # lib/style_presets.md (dark-neon, editorial-serif, minimal-swiss,
 # warm-neutral-teal, bold-geometric). Without --preset, falls back to the
 # Okabe-Ito palette on a white background.
 #
+# --brand-image <url> injects QuickChart's `backgroundImageUrl` plugin so the
+# chart is rendered over a watermark/brand background. The URL must be
+# publicly reachable by QuickChart.
+#
+# When the encoded Chart.js config exceeds ~1900 chars, the script switches
+# automatically to POST /chart (JSON body) to avoid GET URL length limits.
+# Small configs still use GET so meta.json.quickchart_url stays embeddable in
+# Notion.
+#
 # Exit codes: 0 ok · 2 bad args · 3 validation failed · 4 HTTP/curl failed
 set -euo pipefail
 
 preset=""
+brand_image=""
 while [[ "${1:-}" == --* ]]; do
   case "$1" in
     --preset)
       preset="${2:-}"; shift 2 ;;
+    --brand-image)
+      brand_image="${2:-}"; shift 2 ;;
     --print-url)
       print_url_only=1; shift ;;
     *)
@@ -34,13 +46,15 @@ if [[ "$print_url_only" -eq 0 ]]; then
   [[ -n "$out" ]] || { echo "render_chart: out path required" >&2; exit 2; }
 fi
 
-# Build the Chart.js config + URL via python (jq-only JSON construction for nested
-# objects gets verbose). Echoes URL on stdout.
-url=$(python3 - "$spec" "$preset" <<'PY'
-import json, sys, urllib.parse, re
+# Build the Chart.js config and decide GET vs POST. Python prints one line:
+#   GET <url>
+#   POST <endpoint> <body_tmpfile>
+plan=$(python3 - "$spec" "$preset" "$brand_image" <<'PY'
+import json, sys, urllib.parse, tempfile, os
 
 spec_path = sys.argv[1]
 preset_name = sys.argv[2] or None
+brand_url = sys.argv[3] or None
 with open(spec_path, "r", encoding="utf-8") as f:
     spec = json.load(f)
 
@@ -55,13 +69,12 @@ ev = spec.get("evidence") or []
 if not ev:
     errors.append("evidence[] is empty")
 
-# Collect values and assert each appears as a substring of some evidence quote.
 data = spec.get("data") or {}
 datasets = data.get("datasets") or []
 quotes = " ||| ".join(e.get("quote_verbatim", "") for e in ev)
 for ds in datasets:
     for v in ds.get("values", []):
-        if isinstance(v, dict):  # scatter {x,y}
+        if isinstance(v, dict):
             nums = [v.get("x"), v.get("y")]
         else:
             nums = [v]
@@ -70,7 +83,6 @@ for ds in datasets:
                 continue
             s = ("{:g}".format(n)) if isinstance(n, (int, float)) else str(n)
             if s not in quotes:
-                # Try stringified float as-is too.
                 if str(n) not in quotes:
                     errors.append(f"value {n!r} not found in any evidence quote_verbatim")
 
@@ -79,14 +91,10 @@ if errors:
         print(e, file=sys.stderr)
     sys.exit(3)
 
-# Chart.js v4 expects datasets[].data (not .values). Our spec contract uses
-# .values for evidence-check clarity; remap here just before sending to QuickChart.
 for ds in datasets:
     if "values" in ds:
         ds["data"] = ds.pop("values")
 
-# Preset tokens — kept in sync with lib/style_presets.md. Hardcoded because there
-# are only 5 and a markdown parser adds churn.
 PRESETS = {
     "dark-neon": {
         "bg": "#0A0A0F", "text": "#E6E8EF", "grid": "rgba(230,232,239,0.12)",
@@ -110,7 +118,6 @@ PRESETS = {
     },
 }
 
-# Default (no preset) — preserve legacy Okabe-Ito on white.
 DEFAULT = {
     "bg": "white",
     "text": "#111827",
@@ -132,7 +139,6 @@ def _pick(i):
     return PALETTE[i % len(PALETTE)]
 
 def _alpha(hex_color, alpha_hex):
-    """Append 2-digit alpha to a #RRGGBB color. Non-hex colors returned as-is."""
     if hex_color.startswith("#") and len(hex_color) == 7:
         return hex_color + alpha_hex
     return hex_color
@@ -144,7 +150,7 @@ elif kind == "line":
     for i, ds in enumerate(datasets):
         c = _pick(i)
         ds.setdefault("borderColor", c)
-        ds.setdefault("backgroundColor", _alpha(c, "33"))  # ~20% alpha fill
+        ds.setdefault("backgroundColor", _alpha(c, "33"))
         ds.setdefault("tension", 0.2)
 else:
     for i, ds in enumerate(datasets):
@@ -152,12 +158,16 @@ else:
         ds.setdefault("backgroundColor", c)
         ds.setdefault("borderColor", c)
 
-# Shared plugin block — titles, legends, and scale ticks inherit the preset's text color.
 def _plugins(title):
-    return {
+    p = {
         "title":  { "display": True, "text": title, "color": tokens["text"] },
         "legend": { "labels": { "color": tokens["text"] } },
     }
+    if brand_url:
+        # QuickChart-specific plugin — documented under "backgroundImageUrl"
+        # at https://quickchart.io/documentation/add-watermark/
+        p["backgroundImageUrl"] = brand_url
+    return p
 
 def _scales():
     return {
@@ -194,44 +204,96 @@ else:  # bar
             "options": { "plugins": _plugins(title_text),
                          "scales":  _scales() } }
 
-# QuickChart expects hex backgrounds URL-encoded (%23RRGGBB) or named colors.
 bg = tokens["bg"]
 bg_param = urllib.parse.quote(bg, safe="")
-encoded = urllib.parse.quote(json.dumps(cfg, ensure_ascii=False), safe="")
-print(f"https://quickchart.io/chart?c={encoded}&width=800&height=400&backgroundColor={bg_param}&version=4")
+
+# Encode once to decide GET vs POST. Threshold 1900 leaves headroom under the
+# common 2048-byte URL limit after counting the other query params.
+cfg_json = json.dumps(cfg, ensure_ascii=False)
+encoded = urllib.parse.quote(cfg_json, safe="")
+get_url = (f"https://quickchart.io/chart?c={encoded}"
+           f"&width=800&height=400&backgroundColor={bg_param}&version=4")
+
+if len(get_url) <= 1900:
+    print(f"GET {get_url}")
+else:
+    body = {
+        "chart": cfg,
+        "width": 800, "height": 400,
+        "version": 4,
+        "backgroundColor": bg,
+        "format": "png",
+    }
+    fd, body_path = tempfile.mkstemp(prefix="render-chart-body-", suffix=".json")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(body, f, ensure_ascii=False)
+    print(f"POST https://quickchart.io/chart {body_path}")
 PY
 )
 
+method="${plan%% *}"
+rest="${plan#* }"
+
+case "$method" in
+  GET)
+    actual_url="$rest"
+    body_path=""
+    ;;
+  POST)
+    actual_url="${rest%% *}"
+    body_path="${rest##* }"
+    ;;
+  *)
+    echo "render_chart: internal error — unexpected plan method: $plan" >&2; exit 4 ;;
+esac
+
 if [[ "$print_url_only" -eq 1 ]]; then
-  echo "$url"
+  echo "$actual_url"
+  [[ -n "$body_path" ]] && rm -f "$body_path"
   exit 0
 fi
 
 # Fetch the PNG.
 tmp="$(mktemp)"
-if ! curl -fsSL --max-time 30 "$url" -o "$tmp"; then
-  rm -f "$tmp"
-  echo "render_chart: HTTP/curl failed for $url" >&2
-  exit 4
+if [[ "$method" == "GET" ]]; then
+  if ! curl -fsSL --max-time 30 "$actual_url" -o "$tmp"; then
+    rm -f "$tmp"
+    echo "render_chart: HTTP/curl failed (GET) for $actual_url" >&2
+    exit 4
+  fi
+else
+  if ! curl -fsSL --max-time 30 -X POST -H "Content-Type: application/json" \
+      --data @"$body_path" "$actual_url" -o "$tmp"; then
+    rm -f "$tmp" "$body_path"
+    echo "render_chart: HTTP/curl failed (POST) for $actual_url" >&2
+    exit 4
+  fi
+  rm -f "$body_path"
 fi
 mkdir -p "$(dirname "$out")"
 mv "$tmp" "$out"
 
-# Write meta sidecar.
+# Write meta sidecar. For POST renders, quickchart_url is left null so the
+# Notion push code skips the image block (no stable external URL) — the
+# locally-rendered PNG is authoritative.
 meta="${out%.png}.meta.json"
-python3 - "$spec" "$url" "$meta" "$preset" <<'PY'
+python3 - "$spec" "$actual_url" "$meta" "$preset" "$method" "$brand_image" <<'PY'
 import json, sys, pathlib, datetime
-spec  = json.load(open(sys.argv[1], "r", encoding="utf-8"))
-url   = sys.argv[2]
-meta  = pathlib.Path(sys.argv[3])
+spec   = json.load(open(sys.argv[1], "r", encoding="utf-8"))
+url    = sys.argv[2]
+meta   = pathlib.Path(sys.argv[3])
 preset = sys.argv[4] or None
+method = sys.argv[5]
+brand  = sys.argv[6] or None
 out = {
     "id": spec.get("id"),
     "title": spec.get("title"),
     "spec": spec,
     "preset": preset,
+    "brand_image": brand,
+    "render_method": method,
     "rendered_at": datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z",
-    "quickchart_url": url,
+    "quickchart_url": url if method == "GET" else None,
     "source_ids": sorted({ e.get("source_id") for e in (spec.get("evidence") or []) if e.get("source_id") is not None }),
 }
 meta.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
