@@ -3,6 +3,27 @@
 All notable changes to research-engine.
 Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
+## 0.4.0 — 2026-04-20
+
+### Added
+- `lib/style_presets.md` — 5 named visual presets (`dark-neon`, `editorial-serif`, `minimal-swiss`, `warm-neutral-teal`, `bold-geometric`), each with a 5-color palette, a 2-family font pair, density rules, and a reusable Marp `<style>` template with `bento` / `lead` / `divider` / `chart-hero` layout classes.
+- `agents/visualizer-judge.md` — new subagent that scores a rendered deck on 4 axes (Design Quality / Originality / Craft / Functionality, 0–100 total) per Anthropic's harness-design rubric. Separate from `visualizer-deck` to avoid self-evaluation bias.
+- `/research-visualize --judge` flag — when combined with `--slides`, automatically scores the deck and, if <75, regenerates once with the judge's fix-list (hard cap of 2 passes).
+- `/research-visualize --preset <name>` flag — forces both charts and deck to use the same named preset (one of the 5 from `lib/style_presets.md`), eliminating chart-vs-deck palette mismatch. Forwards to `render_chart.sh --preset <name>` and to the deck agent as a `style_preset` input override.
+- `scripts/render_chart.sh --preset <name>` — chart background, text color, grid color, and dataset palette now align with the named preset. Hardcoded tokens kept in sync with `lib/style_presets.md`. Without `--preset`, falls back to the legacy Okabe-Ito palette on white (backwards compatible).
+- Four new bats tests in `tests/bats/test_render_chart.bats` covering `--preset` behavior (valid preset sets bg + accent, unknown preset errors, no preset keeps white).
+- `examples/` — curated reference decks that `visualizer-deck` Step 0 now reads before generating, to absorb compositional rhythm (progressive-disclosure pattern borrowed from robonuggets/marp-slides). First entry: `examples/dark-neon-dashboard.md` (judge-validated at 90/100).
+
+### Changed
+- `agents/visualizer-deck.md` rewritten. Now **requires** picking exactly one style preset from `lib/style_presets.md` and enforces assertion-evidence headings (noun-phrase titles like "Sales Overview" must be rewritten as full sentences with a verb). Hard limits: ≤70 words/slide, ≤6 bullets/slide, ≤2 font families, body ≥24pt, title ≥80pt, ≤25 slides. Every chart slide carries an interpretive assertion above the image; every §상세 분석 slide carries an `[n]` source marker. New optional inputs: `style_preset` (skip inference, use verbatim) and `fixes[]` (apply judge fix-list verbatim on regeneration).
+- `viz.json` schema: new `judge` block `{verdict, total, passes, file, style_preset_detected}`; new `flags.judge` and `flags.preset` fields.
+- `chart.meta.json` sidecar now records the `preset` used during render (null when legacy).
+
+### Notes
+- Existing sessions without `--judge` see no behavior change beyond the stricter deck template.
+- The 4-axis rubric maps directly to Anthropic's Claude Design evaluator published in the 2026-03-24 "Harness Design for Long-Running Application Development" post; weights (35/35/15/15) are applied as tie-breakers, totals are simple sums.
+- Source research for this bump: `research/2026-04-20-ppt-design-improvement-research/README.md`.
+
 ## 0.3.0 — 2026-04-20
 
 ### Added

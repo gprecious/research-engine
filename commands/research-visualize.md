@@ -1,6 +1,6 @@
 ---
 description: Generate charts, optional Mermaid diagrams, and optional Marp slides for an existing research session.
-argument-hint: "[<slug>] [--slides] [--diagrams] [--fresh] [--no-sync-notion]"
+argument-hint: "[<slug>] [--slides] [--diagrams] [--judge] [--preset <name>] [--fresh] [--no-sync-notion]"
 allowed-tools: Bash, Read, Write, Edit, Agent, Glob, Grep
 ---
 
@@ -10,6 +10,8 @@ allowed-tools: Bash, Read, Write, Edit, Agent, Glob, Grep
 - positional `slug` (optional; if absent, use the most recent session)
 - `--slides` — also generate `slides.md` + `.pptx` + `.pdf`
 - `--diagrams` — also generate Mermaid diagrams in the README viz block
+- `--judge` — after building slides, score the deck against the 4-axis rubric and, if <75, automatically regenerate once applying the judge's fix-list (requires `--slides`)
+- `--preset <name>` — force both charts and deck to use one of the 5 named style presets from `lib/style_presets.md` (`dark-neon` / `editorial-serif` / `minimal-swiss` / `warm-neutral-teal` / `bold-geometric`). Without the flag, charts render on white + Okabe-Ito and the deck agent infers its own preset — which can visually disagree with the charts.
 - `--fresh` — wipe and regenerate `figures/`, `slides.*`, and replace the README viz block
 - `--no-sync-notion` — skip the auto-push to Notion at the end of the pipeline
 
@@ -57,7 +59,7 @@ Parse the first fenced JSON block from the reply with `jq`. Extract `charts[]` a
 
 1. Compute `NN` (zero-padded index 01..05) and `<short>` = `bash "${CLAUDE_PLUGIN_ROOT}/scripts/slugify.sh" "<chart.title>"` (slugify.sh caps at 40 chars — fine).
 2. Write the spec JSON to a tempfile via `mktemp`.
-3. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/render_chart.sh" "$tempfile" "$report_dir/figures/chart-NN-<short>.png"`. This call both fetches the PNG and writes the adjacent `chart-NN-<short>.meta.json` (which preserves the spec for reproducibility).
+3. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/render_chart.sh" [--preset "$preset"] "$tempfile" "$report_dir/figures/chart-NN-<short>.png"`. If `--preset <name>` was passed on the command, forward it here so charts match the deck. This call both fetches the PNG and writes the adjacent `chart-NN-<short>.meta.json` (which preserves the spec + chosen preset for reproducibility).
 4. Delete the tempfile.
 5. On success: record `{id, title, png_rel: "figures/chart-NN-<short>.png"}` into `charts_rendered[]` and read `source_ids` from the just-written meta.json.
 6. On failure (non-zero exit from render_chart.sh): append `{chart_id, error}` to `failures_charts[]` and continue.
@@ -68,9 +70,23 @@ Dispatch `agents/visualizer-diagrammer.md`. Parse `diagrams[]`. Keep the raw mer
 
 ### Stage V5 — Build slide deck (only with --slides)
 
-Dispatch `agents/visualizer-deck.md` with inputs that include the already-rendered `charts_rendered[]` and (if present) `diagrams[]`. Receive the `slides.md` content (inside a fenced `markdown` block). Write it to `$report_dir/slides.md`.
+Dispatch `agents/visualizer-deck.md` with inputs that include the already-rendered `charts_rendered[]` and (if present) `diagrams[]`. If `--preset <name>` was passed, include `"style_preset": "<name>"` in the inputs — the deck agent must then use that preset verbatim rather than inferring one. Receive the `slides.md` content (inside a fenced `markdown` block). Write it to `$report_dir/slides.md`.
 
 Then run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/render_slides.sh" "$report_dir/slides.md"`. On non-zero exit, record `{error: "marp_failed"}` in `failures_slides[]` but keep going.
+
+### Stage V5.5 — Judge (only with --judge, requires --slides)
+
+If `--judge` was passed and Stage V5 wrote a `slides.md`:
+
+1. Dispatch `agents/visualizer-judge.md` as a single Agent call with inputs `{slides_md, pptx_path, pdf_path, readme, charts: charts_rendered, slug, report_title}`. The judge returns a single fenced JSON block per its output schema.
+2. Parse with `jq`. Extract `verdict`, `total`, `scores`, `fixes[]`.
+3. Persist the verdict as `$report_dir/judge.json`.
+4. If `verdict == "FAIL"` AND this is the first judge pass of the run:
+   - Dispatch `agents/visualizer-deck.md` a second time with an additional `fixes` field in its input (`{...original_input, fixes: <array from judge>}`). The deck agent must apply every fix — do not cherry-pick.
+   - Overwrite `$report_dir/slides.md` with the new content.
+   - Re-run `render_slides.sh`.
+   - Re-dispatch the judge on the new deck to produce the final `judge.json`. Do NOT loop a third time — two passes is the hard cap (matches the daymade/ppt-creator precedent and prevents infinite grind).
+5. On judge dispatch failure (non-JSON reply, dispatch error), record `{error: "judge_failed", detail: "..."}` in `failures_slides[]` but keep the original `slides.md`.
 
 ### Stage V6 — Build viz block and patch README
 
@@ -114,10 +130,11 @@ Write `$report_dir/viz.json`:
 {
   "slug": "...",
   "generated_at": "<ISO>",
-  "flags": { "slides": true, "diagrams": false, "fresh": false },
+  "flags": { "slides": true, "diagrams": false, "judge": false, "preset": "dark-neon|null", "fresh": false },
   "charts": [ { "id": "c1", "title": "...", "png_rel": "figures/..." } ],
   "diagrams": [ { "id": "d1", "title": "...", "placement": "...", "evidence_src_ids": [1,2] } ],
   "slides": { "md": "slides.md", "pptx": "slides.pptx|null", "pdf": "slides.pdf|null" },
+  "judge": { "verdict": "PASS|FAIL|null", "total": 0, "passes": 0, "file": "judge.json|null" },
   "rejected_charts": [ ... ],
   "failures": { "charts": [...], "slides": [...] }
 }
@@ -133,11 +150,12 @@ Unless `--no-sync-notion` was passed:
 
 ### Stage V9 — Final message
 
-Print a two- or three-line summary:
+Print a two- to four-line summary:
 
 - Line 1: paths (README.md, any generated `slides.*`, count of figures).
 - Line 2: `viz.json` path + failure count (or "no failures").
-- Line 3 (when pushed): `📒 Notion: <url>` from `sources.json.output_notion_url`.
+- Line 3 (when `--judge` was used): `🧑‍⚖️ Judge: <verdict> (<total>/100 after <passes> pass(es))`.
+- Line 4 (when pushed): `📒 Notion: <url>` from `sources.json.output_notion_url`.
 
 ## Idempotency
 

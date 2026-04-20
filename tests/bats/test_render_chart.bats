@@ -124,6 +124,35 @@ assert len(set(colors)) == len(colors), f"duplicate colors across datasets: {col
 ' "$decoded"
 }
 
+@test "--preset dark-neon sets background to %230A0A0F in URL" {
+  valid_spec
+  run "$SCRIPT" --preset dark-neon --print-url "$SPEC"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"backgroundColor=%230A0A0F"* ]]
+}
+
+@test "--preset dark-neon injects lime accent color in dataset backgroundColor" {
+  valid_spec
+  run "$SCRIPT" --preset dark-neon --print-url "$SPEC"
+  [ "$status" -eq 0 ]
+  # Lime #B6FF3C gets URL-encoded to %23B6FF3C inside the config JSON
+  [[ "$output" == *"%23B6FF3C"* ]]
+}
+
+@test "--preset rejects unknown name" {
+  valid_spec
+  run "$SCRIPT" --preset not-a-real-preset --print-url "$SPEC"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"unknown preset"* ]]
+}
+
+@test "without --preset keeps legacy white background" {
+  valid_spec
+  run "$SCRIPT" --print-url "$SPEC"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"backgroundColor=white"* ]]
+}
+
 @test "pie chart receives per-slice backgroundColor array" {
   cat > "$SPEC" <<'EOF'
 { "id": "cp", "title": "pie test", "kind": "pie",
