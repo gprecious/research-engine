@@ -1,0 +1,86 @@
+{
+  "$schema_version": 1,
+  "description": "Single source of truth for the 5 named slide style presets. Consumed by scripts/render_chart.sh (chart palette/background) and referenced by lib/style_presets.md (human documentation + Marp <style> template). If you add a preset, update both files and add tests.",
+  "presets": {
+    "dark-neon": {
+      "bg": "#0A0A0F",
+      "surface": "#14141C",
+      "text": "#E6E8EF",
+      "accent1": "#B6FF3C",
+      "accent2": "#3DA9FF",
+      "grid": "rgba(230,232,239,0.12)",
+      "palette": ["#B6FF3C", "#3DA9FF", "#E6E8EF", "#14141C", "#6DFFC1", "#FF5C8A"],
+      "heading_font": "Space Grotesk",
+      "heading_weight": 700,
+      "body_font": "IBM Plex Mono",
+      "body_weight": 300,
+      "density": "airy",
+      "use_when": "dashboards, metric-heavy, modern tech product"
+    },
+    "editorial-serif": {
+      "bg": "#FAF7F2",
+      "surface": "#FFFFFF",
+      "text": "#1B1B1E",
+      "accent1": "#B54E3A",
+      "accent2": "#2E5E4E",
+      "grid": "rgba(27,27,30,0.10)",
+      "palette": ["#B54E3A", "#2E5E4E", "#1B1B1E", "#D7B87A", "#8C6F4A", "#4E6E8C"],
+      "heading_font": "DM Serif Display",
+      "heading_weight": 400,
+      "body_font": "DM Sans",
+      "body_weight": 300,
+      "density": "generous",
+      "use_when": "long-form research, reflective, policy"
+    },
+    "minimal-swiss": {
+      "bg": "#FFFFFF",
+      "surface": "#F3F3F3",
+      "text": "#0D0D0D",
+      "accent1": "#E63946",
+      "accent2": "#0D4F8B",
+      "grid": "rgba(13,13,13,0.08)",
+      "palette": ["#E63946", "#0D4F8B", "#0D0D0D", "#6B7280", "#1F8A8B", "#F59E0B"],
+      "heading_font": "Inter",
+      "heading_weight": 800,
+      "body_font": "Inter",
+      "body_weight": 300,
+      "density": "dense",
+      "use_when": "default for reports; clean, typography-first"
+    },
+    "warm-neutral-teal": {
+      "bg": "#F5EFE4",
+      "surface": "#FFFFFF",
+      "text": "#2B241E",
+      "accent1": "#1F8A8B",
+      "accent2": "#6B4F3B",
+      "grid": "rgba(43,36,30,0.12)",
+      "palette": ["#1F8A8B", "#6B4F3B", "#2B241E", "#C98A5C", "#8C6F4A", "#4E6E8C"],
+      "heading_font": "Fraunces",
+      "heading_weight": 700,
+      "body_font": "Inter",
+      "body_weight": 400,
+      "density": "generous",
+      "use_when": "human-centric, strategy, 2026 restorative palette"
+    },
+    "bold-geometric": {
+      "bg": "#0E1116",
+      "surface": "#1A1F2B",
+      "text": "#F4F4F4",
+      "accent1": "#FFCC00",
+      "accent2": "#FF4F4F",
+      "grid": "rgba(244,244,244,0.12)",
+      "palette": ["#FFCC00", "#FF4F4F", "#F4F4F4", "#1A1F2B", "#3DA9FF", "#B6FF3C"],
+      "heading_font": "Archivo Black",
+      "heading_weight": 900,
+      "body_font": "Archivo",
+      "body_weight": 400,
+      "density": "airy",
+      "use_when": "launch decks, announcements, hero-slide heavy"
+    }
+  },
+  "density_rules": {
+    "airy":     { "padding_top": "120px", "padding_side": "80px", "bullets_per_slide_max": 5 },
+    "generous": { "padding_top": "96px",  "padding_side": "72px", "bullets_per_slide_max": 4 },
+    "dense":    { "padding_top": "64px",  "padding_side": "56px", "bullets_per_slide_max": 6 }
+  }
+}

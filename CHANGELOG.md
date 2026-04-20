@@ -3,6 +3,16 @@
 All notable changes to research-engine.
 Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
+## 0.5.1 — 2026-04-20
+
+### Changed
+- `lib/presets.json` is now the single source of truth for the 5 preset tokens (palette/bg/text/grid/fonts/density). `scripts/render_chart.sh` loads it at runtime instead of maintaining a hardcoded Python dict. `lib/style_presets.md` explicitly defers to the JSON.
+- `lib/style_presets.md` adds `section.sources` as a first-class layout class. The class deliberately violates the 24pt body minimum (drops to 14pt in a 2-column `<ol>`) so 25–35 reference entries fit one slide — this was previously an ad-hoc workaround flagged by `visualizer-judge`. Reports with >35 sources should split into Sources-1/Sources-2 rather than shrinking further.
+
+### Notes
+- Consumers can override the preset path via `RESEARCH_ENGINE_PRESETS=<path/to/presets.json>` (useful for testing custom preset sets).
+- No test changes — 58/58 still green. The refactor is behavior-preserving.
+
 ## 0.5.0 — 2026-04-20
 
 ### Added

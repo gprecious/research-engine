@@ -49,12 +49,16 @@ fi
 # Build the Chart.js config and decide GET vs POST. Python prints one line:
 #   GET <url>
 #   POST <endpoint> <body_tmpfile>
-plan=$(python3 - "$spec" "$preset" "$brand_image" <<'PY'
+script_dir="$(dirname "$(readlink -f "$0" 2>/dev/null || realpath "$0")")"
+registry_path="${RESEARCH_ENGINE_PRESETS:-$script_dir/../lib/presets.json}"
+
+plan=$(python3 - "$spec" "$preset" "$brand_image" "$registry_path" <<'PY'
 import json, sys, urllib.parse, tempfile, os
 
 spec_path = sys.argv[1]
 preset_name = sys.argv[2] or None
 brand_url = sys.argv[3] or None
+registry_path = sys.argv[4]
 with open(spec_path, "r", encoding="utf-8") as f:
     spec = json.load(f)
 
@@ -95,27 +99,26 @@ for ds in datasets:
     if "values" in ds:
         ds["data"] = ds.pop("values")
 
+# Load the preset registry from lib/presets.json (single source of truth,
+# shared with lib/style_presets.md and any future tooling). Path is resolved
+# in the shell wrapper so this heredoc stays portable.
+if not os.path.isfile(registry_path):
+    print(f"render_chart: preset registry not found at {registry_path!r}", file=sys.stderr)
+    sys.exit(2)
+with open(registry_path, "r", encoding="utf-8") as f:
+    registry = json.load(f)
+PRESETS = registry["presets"]
+
+# Normalize preset shape to the {bg, text, grid, palette} subset render_chart.sh
+# actually consumes (other fields like font/density are for deck/docs only).
 PRESETS = {
-    "dark-neon": {
-        "bg": "#0A0A0F", "text": "#E6E8EF", "grid": "rgba(230,232,239,0.12)",
-        "palette": ["#B6FF3C", "#3DA9FF", "#E6E8EF", "#14141C", "#6DFFC1", "#FF5C8A"],
-    },
-    "editorial-serif": {
-        "bg": "#FAF7F2", "text": "#1B1B1E", "grid": "rgba(27,27,30,0.10)",
-        "palette": ["#B54E3A", "#2E5E4E", "#1B1B1E", "#D7B87A", "#8C6F4A", "#4E6E8C"],
-    },
-    "minimal-swiss": {
-        "bg": "#FFFFFF", "text": "#0D0D0D", "grid": "rgba(13,13,13,0.08)",
-        "palette": ["#E63946", "#0D4F8B", "#0D0D0D", "#6B7280", "#1F8A8B", "#F59E0B"],
-    },
-    "warm-neutral-teal": {
-        "bg": "#F5EFE4", "text": "#2B241E", "grid": "rgba(43,36,30,0.12)",
-        "palette": ["#1F8A8B", "#6B4F3B", "#2B241E", "#C98A5C", "#8C6F4A", "#4E6E8C"],
-    },
-    "bold-geometric": {
-        "bg": "#0E1116", "text": "#F4F4F4", "grid": "rgba(244,244,244,0.12)",
-        "palette": ["#FFCC00", "#FF4F4F", "#F4F4F4", "#1A1F2B", "#3DA9FF", "#B6FF3C"],
-    },
+    name: {
+        "bg": p["bg"],
+        "text": p["text"],
+        "grid": p["grid"],
+        "palette": p["palette"],
+    }
+    for name, p in PRESETS.items()
 }
 
 DEFAULT = {

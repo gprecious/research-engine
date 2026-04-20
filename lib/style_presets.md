@@ -2,6 +2,8 @@
 
 5 named visual presets for `visualizer-deck`. Each encodes background/surface/text/accent palette, a tested Google Fonts pairing, and a layout density rule. The deck agent **MUST** pick one and stick with it for the whole deck — no mixing across slides.
 
+> **Machine-readable tokens live in [`lib/presets.json`](./presets.json).** That file is the single source of truth consumed by `scripts/render_chart.sh` (and future tools). Keep the table below in sync with the JSON — if they drift, the JSON wins.
+
 When intent is ambiguous, default to `minimal-swiss`. When the report is about data/metrics, prefer `dark-neon` or `bold-geometric`. When the report is reflective/long-form prose, prefer `editorial-serif` or `warm-neutral-teal`.
 
 ## Palette & typography contract
@@ -63,6 +65,10 @@ section.divider h1 { font-size: 96pt; }
 section.bento { display: grid; grid-template-columns: 1.2fr 1fr; gap: 48px; }
 section.chart-hero { padding: 48px; }
 section.chart-hero img { width: 100%; height: auto; }
+section.sources { font-size: 14pt; padding: 64px 80px; }
+section.sources h1 { font-size: 44pt; margin-bottom: 24px; }
+section.sources ol { columns: 2; column-gap: 48px; padding-left: 24px; }
+section.sources li { margin-bottom: 6px; break-inside: avoid; }
 section::after { color: var(--text); opacity: 0.4; font-size: 12pt; }
 </style>
 ```
@@ -74,13 +80,14 @@ section::after { color: var(--text); opacity: 0.4; font-size: 12pt; }
 
 ## Layout variants
 
-The deck agent picks from 5 section classes and tags each slide's opening directive accordingly:
+The deck agent picks from 6 section classes and tags each slide's opening directive accordingly:
 
 - `<!-- _class: title -->` — cover / first slide only
 - `<!-- _class: lead -->` — section divider or single big assertion
 - `<!-- _class: divider -->` — hard reset between parts; single word or short phrase
 - `<!-- _class: bento -->` — two-column grid (e.g., assertion + evidence bullets)
 - `<!-- _class: chart-hero -->` — single chart fills the slide; caption in `_footer`
+- `<!-- _class: sources -->` — reference list slide. Deliberately **violates the 24pt body minimum** (drops to 14pt) and flows into a 2-column `<ol>` so 25–35 entries fit one slide. Do NOT use this class for content slides. If a report has >35 sources, split into Sources-1 / Sources-2 instead of shrinking further.
 
 Default (no class) = content slide with heading + bullets.
 
