@@ -46,6 +46,11 @@ Tip: once installed, replace the snapshot in `~/.claude/plugins/cache/research-e
 
 /research-followup "저자 배경 더"         # ask follow-up on latest session
 /research-followup "..." --slug <name>    # target specific session
+
+/research-visualize <slug>                # generate data charts in README
+/research-visualize <slug> --diagrams     # + Mermaid diagrams
+/research-visualize <slug> --slides       # + Marp slide deck (.pptx/.pdf)
+/research-visualize                        # use most recent session
 ```
 
 Output lands in `research/YYYY-MM-DD-<slug>/README.md`. When Notion is configured, a consolidated report is also upserted as a row in a `research-engine` database under the configured parent page (one row per session, re-runs update in place).
@@ -69,6 +74,12 @@ chmod 600 ~/.config/research-engine/notion.env
 
 If not configured, `/research` silently skips the Notion step and continues with local markdown only.
 
+## Visualization (optional)
+
+`/research-visualize <slug>` post-processes a completed session into data charts (QuickChart PNG, default), Mermaid diagrams (`--diagrams`), and Marp slide decks (`--slides`). Outputs land under `research/<slug>/figures/` and `research/<slug>/slides.*`. The README gains a `<!-- viz:begin --> ... <!-- viz:end -->` block that's safe to re-run (idempotent).
+
+Mermaid diagrams are mirrored to Notion automatically by `push_to_notion.sh` (they're plain markdown). Chart PNGs are local-only in this version — run `push_to_notion.sh` again after `/research-visualize` to re-sync the Mermaid text.
+
 ## Requirements
 
 - `yt-dlp` in `PATH` (YouTube captions)
@@ -76,6 +87,7 @@ If not configured, `/research` silently skips the Notion step and continues with
 - `jq` (JSON munging)
 - `perl` with UTF-8 support (for Unicode-aware slugify; standard on Debian/Ubuntu)
 - Claude Code plugins: `firecrawl`, `context7`, `huggingface-skills`
+- Optional: `npx` (Node 18+) — only when using `/research-visualize --slides` to render via `@marp-team/marp-cli`.
 
 ## Docs
 
