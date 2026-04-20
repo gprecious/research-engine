@@ -60,7 +60,7 @@ Parse the first fenced JSON block from the reply with `jq`. Extract `charts[]` a
 
 1. Compute `NN` (zero-padded index 01..05) and `<short>` = `bash "${CLAUDE_PLUGIN_ROOT}/scripts/slugify.sh" "<chart.title>"` (slugify.sh caps at 40 chars — fine).
 2. Write the spec JSON to a tempfile via `mktemp`.
-3. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/render_chart.sh" [--preset "$preset"] [--brand-image "$brand_image"] "$tempfile" "$report_dir/figures/chart-NN-<short>.png"`. Forward `--preset` and `--brand-image` when the command flags are set. Render automatically switches to POST /chart when the encoded Chart.js config exceeds ~1900 chars. This call both fetches the PNG and writes the adjacent `chart-NN-<short>.meta.json` (which preserves the spec, chosen preset, brand image, and render method for reproducibility).
+3. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/render_chart.sh" [--preset "$preset"] [--brand-image "$brand_image"] "$tempfile" "$report_dir/figures/chart-NN-<short>.png"`. Forward `--preset` when the command flag is set. If `--preset` is absent AND `--slides` is present, run `scripts/pick_preset.py` on `README.md` FIRST (before Stage V3 starts) so the auto-picked preset is forwarded to every chart render — charts and deck then share a single preset end-to-end. Also forward `--brand-image` when set. Render auto-switches to POST /chart when the encoded Chart.js config exceeds ~1900 chars. meta.json preserves the spec, chosen preset, brand image, and render method for reproducibility.
 4. Delete the tempfile.
 5. On success: record `{id, title, png_rel: "figures/chart-NN-<short>.png"}` into `charts_rendered[]` and read `source_ids` from the just-written meta.json.
 6. On failure (non-zero exit from render_chart.sh): append `{chart_id, error}` to `failures_charts[]` and continue.
@@ -71,7 +71,12 @@ Dispatch `agents/visualizer-diagrammer.md`. Parse `diagrams[]`. Keep the raw mer
 
 ### Stage V5 — Build slide deck (only with --slides)
 
-Dispatch `agents/visualizer-deck.md` with inputs that include the already-rendered `charts_rendered[]` and (if present) `diagrams[]`. If `--preset <name>` was passed, include `"style_preset": "<name>"` in the inputs — the deck agent must then use that preset verbatim rather than inferring one. Receive the `slides.md` content (inside a fenced `markdown` block). Write it to `$report_dir/slides.md`.
+Determine the effective style preset:
+1. If `--preset <name>` was passed, use that.
+2. Otherwise, run `preset=$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pick_preset.py" "$report_dir/README.md")` and use its output. The picker is deterministic and grounded in content keywords — this replaces the deck agent's Step-1 inference with a reproducible choice.
+3. Record the chosen preset in `viz.json.flags.preset` regardless of source (`--preset` flag, picker, or `null` if the user disabled both, though that path isn't currently exposed).
+
+Dispatch `agents/visualizer-deck.md` with inputs that include the already-rendered `charts_rendered[]`, (if present) `diagrams[]`, and `"style_preset": "<resolved_preset>"`. The deck agent must use that preset verbatim — Step 1 inference is only a fallback when `style_preset` is absent from the inputs. Receive the `slides.md` content (inside a fenced `markdown` block). Write it to `$report_dir/slides.md`.
 
 Then run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/render_slides.sh" "$report_dir/slides.md"`. On non-zero exit, record `{error: "marp_failed"}` in `failures_slides[]` but keep going.
 

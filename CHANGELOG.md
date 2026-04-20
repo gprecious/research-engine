@@ -3,6 +3,18 @@
 All notable changes to research-engine.
 Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
+## 0.7.0 — 2026-04-20
+
+### Added
+- `scripts/pick_preset.py` — deterministic preset selector. Reads README.md, counts keyword hits across 5 preset profiles (dark-neon / editorial-serif / minimal-swiss / warm-neutral-teal / bold-geometric), prints the highest-scoring preset name. Pure stdlib, exits 0 always. Use `--scores` to get per-preset scores as JSON.
+- `/research-visualize` now runs `pick_preset.py` automatically when `--preset <name>` is absent and `--slides` is present. Charts and deck share the auto-picked preset end-to-end, removing the previous non-determinism where the deck agent inferred a preset in its own Step 1.
+- 12 new bats tests in `tests/bats/test_pick_preset.bats`: every preset picked on representative content, empty-content default, tie-break behavior, frontmatter-ignored, markdown-link label not mis-scored, missing-file error. Full suite 87/87.
+
+### Notes
+- `bold-geometric` keywords are deliberately narrow (`launch`, `keynote`, `unveil`, `debut`, `rollout`, `campaign`) so any document that merely mentions "presentation" does NOT flood it. Similarly `product` is excluded — too generic.
+- Tie-break order favors `minimal-swiss` (declared default for typography-first reports) → `editorial-serif` → `dark-neon` → `warm-neutral-teal` → `bold-geometric`.
+- Frontmatter is stripped before scoring so meta-fields in `---` blocks can't bias the winner.
+
 ## 0.6.1 — 2026-04-20
 
 ### Added
