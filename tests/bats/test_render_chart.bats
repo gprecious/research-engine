@@ -106,3 +106,40 @@ for ds in cfg["data"]["datasets"]:
     assert "values" not in ds, f"dataset still has values key: {ds}"
 ' "$decoded"
 }
+
+@test "bar datasets receive distinct palette colors" {
+  valid_spec
+  run "$SCRIPT" --print-url "$SPEC"
+  [ "$status" -eq 0 ]
+  decoded="$(python3 -c 'import sys,urllib.parse; print(urllib.parse.unquote(sys.argv[1].split("c=")[1].split("&")[0]))' "$output")"
+  python3 -c '
+import json, sys
+cfg = json.loads(sys.argv[1])
+ds = cfg["data"]["datasets"]
+for d in ds:
+    c = d.get("backgroundColor")
+    assert isinstance(c, str) and c.startswith("#"), f"missing/invalid backgroundColor: {d}"
+colors = [d["backgroundColor"] for d in ds]
+assert len(set(colors)) == len(colors), f"duplicate colors across datasets: {colors}"
+' "$decoded"
+}
+
+@test "pie chart receives per-slice backgroundColor array" {
+  cat > "$SPEC" <<'EOF'
+{ "id": "cp", "title": "pie test", "kind": "pie",
+  "data": { "labels": ["A","B","C"], "datasets": [ { "label": "s", "values": [1, 2, 3] } ] },
+  "evidence": [ { "source_id": 1, "quote_verbatim": "A=1 B=2 C=3" } ] }
+EOF
+  run "$SCRIPT" --print-url "$SPEC"
+  [ "$status" -eq 0 ]
+  decoded="$(python3 -c 'import sys,urllib.parse; print(urllib.parse.unquote(sys.argv[1].split("c=")[1].split("&")[0]))' "$output")"
+  python3 -c '
+import json, sys
+cfg = json.loads(sys.argv[1])
+bg = cfg["data"]["datasets"][0]["backgroundColor"]
+assert isinstance(bg, list), f"pie expects array of colors, got {type(bg)}"
+assert len(bg) == 3, f"expected 3 slice colors, got {len(bg)}"
+for c in bg:
+    assert c.startswith("#")
+' "$decoded"
+}

@@ -16,12 +16,27 @@ if ! command -v npx >/dev/null 2>&1; then
 fi
 
 # --allow-local-files is required so Marp can read figures/*.png referenced with
-# relative paths. --html is off by default; we request pptx+pdf explicitly.
+# relative paths. marp-cli rejects --pptx and --pdf together, so invoke twice.
 cd "$dir"
-if ! npx --yes @marp-team/marp-cli@latest "$(basename "$slides")" \
-       --pptx --pdf --allow-local-files; then
-  echo "render_slides: marp-cli failed (network? node version?). slides.md kept." >&2
+base="$(basename "$slides")"
+pptx_ok=0; pdf_ok=0
+if npx --yes @marp-team/marp-cli@latest "$base" --pptx --allow-local-files; then
+  pptx_ok=1
+else
+  echo "render_slides: pptx render failed (network? node version?)." >&2
+fi
+if npx --yes @marp-team/marp-cli@latest "$base" --pdf --allow-local-files; then
+  pdf_ok=1
+else
+  echo "render_slides: pdf render failed." >&2
+fi
+
+if (( pptx_ok == 0 && pdf_ok == 0 )); then
+  echo "render_slides: both pptx and pdf failed — slides.md kept." >&2
   exit 3
 fi
 
-echo "slides rendered: $dir/slides.pptx + $dir/slides.pdf"
+produced=()
+(( pptx_ok )) && produced+=("$dir/slides.pptx")
+(( pdf_ok )) && produced+=("$dir/slides.pdf")
+echo "slides rendered: ${produced[*]}"

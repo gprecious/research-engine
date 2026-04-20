@@ -72,6 +72,38 @@ for ds in datasets:
     if "values" in ds:
         ds["data"] = ds.pop("values")
 
+# Colorblind-friendly qualitative palette (Okabe-Ito, extended).
+# Applied per-dataset (bar/line/scatter) or per-slice (pie within a single dataset).
+PALETTE = [
+    "#5B8FF9",  # blue
+    "#F6BD16",  # amber
+    "#5AD8A6",  # green
+    "#E8684A",  # coral
+    "#945FB9",  # purple
+    "#6DC8EC",  # sky
+    "#9270CA",  # violet
+    "#FF9D4D",  # orange
+]
+
+def _pick(i):
+    return PALETTE[i % len(PALETTE)]
+
+if kind == "pie":
+    # One dataset, colors per slice.
+    for ds in datasets:
+        ds.setdefault("backgroundColor", [_pick(i) for i in range(len(ds.get("data", [])))])
+elif kind == "line":
+    for i, ds in enumerate(datasets):
+        c = _pick(i)
+        ds.setdefault("borderColor", c)
+        ds.setdefault("backgroundColor", c + "33")  # 20% alpha fill
+        ds.setdefault("tension", 0.2)
+else:
+    for i, ds in enumerate(datasets):
+        c = _pick(i)
+        ds.setdefault("backgroundColor", c)
+        ds.setdefault("borderColor", c)
+
 # Build Chart.js config.
 if kind == "horizontal_bar":
     cfg = { "type": "bar",
