@@ -41,8 +41,13 @@ section.divider { background: var(--a1); color: var(--bg); }
 section.divider h1 { font-size: 96pt; }
 section.divider-num { background: var(--a1); color: var(--bg); display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
 section.divider-num h1 { font-size: 200pt; line-height: 0.9; margin: 0; color: var(--bg); }
-section.divider-num p { font-family: var(--heading-font); font-size: 32pt; margin-top: 16px; color: var(--bg); opacity: 0.75; }
+section.divider-num p { font-family: var(--heading-font); font-size: 32pt; margin-top: 16px; color: var(--bg); opacity: 0.75; border-top: 4px solid var(--bg); padding-top: 20px; width: fit-content; }
 section.bento { display: grid; grid-template-columns: 1.2fr 1fr; gap: 48px; }
+section.timeline { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; padding: 96px 80px; }
+section.timeline .col { border-left: 6px solid var(--a1); padding-left: 28px; }
+section.timeline .col h3 { font-size: 28pt; margin: 0 0 20px 0; color: var(--a1); }
+section.timeline .col ul { margin: 0; padding-left: 20px; }
+section.timeline .col li { margin-bottom: 16px; line-height: 1.35; }
 section.chart-hero { padding: 48px; }
 section.chart-hero img { width: 100%; height: auto; }
 section.sources { font-size: 14pt; padding: 64px 80px; }
@@ -243,20 +248,26 @@ ryanbbrown은 렌더 후 오버플로우를 자동 검출한다.
 
 ---
 
-<!-- _class: divider-num -->
-
-# 실행.
-
-P0→P3 2주 패치
-
----
+<!-- _class: timeline -->
 
 ## P0·P1·P2를 **2주 안**에 연쇄 배치한다
 
-- P0 — 제목 규칙 + Design Rules 8개 + examples/ [23,27]
-- P1 — visualizer-judge + Playwright QA + presets.py [1,24]
-- P2 — 3-preview + backend dispatcher + POST [25,26,17]
-- P3 — ChartMimic + docling 자동 스코어 [29,30]
+<div class="col">
+
+### Week 1 — 기반
+
+- **P0** 제목 규칙 + Design Rules 8개 + examples/ [23,27]
+- **P1** visualizer-judge + Playwright QA + presets.py [1,24]
+
+</div>
+<div class="col">
+
+### Week 2 — 확장
+
+- **P2** 3-preview + backend dispatcher + POST [25,26,17]
+- **P3** ChartMimic + docling 자동 스코어 [29,30]
+
+</div>
 
 ---
 

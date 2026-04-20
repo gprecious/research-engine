@@ -3,6 +3,16 @@
 All notable changes to research-engine.
 Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
+## 0.8.2 — 2026-04-20
+
+### Changed
+- `examples/dark-neon-dashboard.md` promoted to v4 — introduces a new `section.timeline` 2-column CSS grid layout class (used on the roadmap slide to visually support "sequence" claims — Week 1 / Week 2 with lime left-border accents) and tightens the `section.divider-num p` subtitle rule with `border-top: 4px solid var(--bg)` + `padding-top: 20px` + `width: fit-content` so the caption reads as intentional structure, not leftover body.
+
+### Notes — Ceiling probe
+- Ran 4 judge cycles on the same research deck: 87 → 90 → 90 → **89**. v4's fixes landed cleanly (0 regressions, linter confirms) but net score dropped 1 as new deductions surfaced (pseudo-numeral divider, sources 14pt rhythm break, lead/title size proximity).
+- Judge explicitly stated: **~90 is the structural ceiling for this content profile (single preset, 4 charts, 22 slides, meta-topic)**. Breaking 92+ requires scope expansion — adding a second visual register (full-bleed photo, inline SVG data-viz beyond QuickChart PNGs, multi-page photographic lead) — not polish of existing elements.
+- Shipping v4 anyway: the new `timeline` layout class is genuinely a better compositional reference than v3's label list, even at -1 score. This is documented in `research/<slug>/judge.json.ceiling_analysis`.
+
 ## 0.8.1 — 2026-04-20
 
 ### Added
