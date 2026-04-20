@@ -75,6 +75,17 @@ Dispatch `agents/visualizer-deck.md` with inputs that include the already-render
 
 Then run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/render_slides.sh" "$report_dir/slides.md"`. On non-zero exit, record `{error: "marp_failed"}` in `failures_slides[]` but keep going.
 
+### Stage V5.1 — Lint slides.md (only with --slides)
+
+Immediately after Stage V5 writes `slides.md`, run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/lint_slides.py" "$report_dir/slides.md" > "$report_dir/lint.json"`. The linter exits 0 regardless of findings — it's advisory.
+
+Parse `lint.json`:
+- If `violations[]` is non-empty AND `--judge` is also set, include the violations in the judge dispatch prompt so the judge knows the mechanical rule breaks without re-deriving them.
+- If `violations[]` is non-empty AND `--judge` is NOT set, log them to stdout as `viz: lint flagged N violation(s) — consider --judge for auto-refine`.
+- `warnings[]` (declared exceptions like `section.sources`) are informational only; never escalated.
+
+The linter catches mechanical rule breaks (bullets/words/slide count, body-size, font-family count, noun-phrase headings) BEFORE the expensive judge dispatch — the judge can focus on the subjective axes (Design Quality, Originality) instead.
+
 ### Stage V5.5 — Judge (only with --judge, requires --slides)
 
 If `--judge` was passed and Stage V5 wrote a `slides.md`:
@@ -136,6 +147,7 @@ Write `$report_dir/viz.json`:
   "diagrams": [ { "id": "d1", "title": "...", "placement": "...", "evidence_src_ids": [1,2] } ],
   "slides": { "md": "slides.md", "pptx": "slides.pptx|null", "pdf": "slides.pdf|null" },
   "judge": { "verdict": "PASS|FAIL|null", "total": 0, "passes": 0, "file": "judge.json|null" },
+  "lint":  { "violations": 0, "warnings": 1, "file": "lint.json|null" },
   "rejected_charts": [ ... ],
   "failures": { "charts": [...], "slides": [...] }
 }

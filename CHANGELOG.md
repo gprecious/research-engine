@@ -3,6 +3,18 @@
 All notable changes to research-engine.
 Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
+## 0.6.0 — 2026-04-20
+
+### Added
+- `scripts/lint_slides.py` — deterministic pre-judge linter for `slides.md`. Catches mechanical rule violations (≤70 words/slide, ≤6 bullets/slide, ≤25 slides total, body ≥24pt, ≤2 font families, assertion-evidence headings) before paying for a `visualizer-judge` dispatch. Python stdlib only, no dependencies. Exits 0 and emits JSON so callers choose severity.
+- `/research-visualize` Stage V5.1 runs the linter automatically after `slides.md` is written. `viz.json.lint` now records violation/warning counts and the `lint.json` sidecar path.
+- Linter feeds its `violations[]` into the judge prompt when both `--slides` and `--judge` are set, so the judge concentrates on subjective axes (Design Quality, Originality) rather than re-checking mechanical rules.
+- 12 new bats tests in `tests/bats/test_lint_slides.bats` covering every rule (bullets, words, slide count, body size, font families, assertion Korean/English heuristics, `section.sources` declared exception, missing file). Full suite now 70/70.
+
+### Notes
+- The linter recognizes `section.sources` as a declared exception — its 14pt body and long reference list emit a `warnings[]` entry but never a `violations[]` entry.
+- Assertion-heading heuristic: Korean verb-ending detection (다/한다/된다/이다/있다/…) + English common-verb tokens (is/are/has/have/grew/dropped/…). Imperfect but catches the dominant "Sales Overview" failure mode.
+
 ## 0.5.1 — 2026-04-20
 
 ### Changed

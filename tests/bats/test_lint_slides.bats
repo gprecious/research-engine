@@ -1,0 +1,227 @@
+#!/usr/bin/env bats
+
+SCRIPT="$BATS_TEST_DIRNAME/../../scripts/lint_slides.py"
+
+setup() {
+  TMPDIR_T="$(mktemp -d)"
+  SLIDES="$TMPDIR_T/slides.md"
+}
+teardown() { rm -rf "$TMPDIR_T"; }
+
+clean_deck() {
+  cat > "$SLIDES" <<'EOF'
+---
+marp: true
+theme: default
+paginate: true
+---
+
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&family=IBM+Plex+Mono:wght@300" rel="stylesheet">
+
+<style>
+section { font-size: 24pt; }
+</style>
+
+<!-- _class: title -->
+
+# 얇은 스택이 텍스트 과다를 낳는다
+
+---
+
+## 4축 rubric으로 덱을 평가한다
+
+- Design Quality [1]
+- Originality [1]
+- Craft [1]
+- Functionality [1]
+EOF
+}
+
+@test "exits 0 and emits JSON" {
+  clean_deck
+  run python3 "$SCRIPT" "$SLIDES"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"slide_count"'* ]]
+  [[ "$output" == *'"violations"'* ]]
+}
+
+@test "clean deck has zero violations" {
+  clean_deck
+  run python3 "$SCRIPT" "$SLIDES"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"violations": []'* ]]
+}
+
+@test "flags bullet-count over max" {
+  cat > "$SLIDES" <<'EOF'
+---
+marp: true
+---
+<style>section { font-size: 24pt; }</style>
+
+## 7 bullet 슬라이드를 허용하지 않는다
+
+- a
+- b
+- c
+- d
+- e
+- f
+- g
+EOF
+  run python3 "$SCRIPT" "$SLIDES"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"bullets_over_max"'* ]]
+  [[ "$output" == *'"7 bullets (max 6)"'* ]]
+}
+
+@test "flags word-count over max" {
+  # Assemble a slide with > 70 content words.
+  big_body="$(printf '가나다 %.0s' {1..120})"
+  cat > "$SLIDES" <<EOF
+---
+marp: true
+---
+<style>section { font-size: 24pt; }</style>
+
+## 아주 긴 문단이 들어왔다
+
+${big_body}
+EOF
+  run python3 "$SCRIPT" "$SLIDES"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"words_over_max"'* ]]
+}
+
+@test "flags noun-phrase heading" {
+  cat > "$SLIDES" <<'EOF'
+---
+marp: true
+---
+<style>section { font-size: 24pt; }</style>
+
+## Sales Overview
+
+- a
+- b
+EOF
+  run python3 "$SCRIPT" "$SLIDES"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"heading_noun_phrase"'* ]]
+  [[ "$output" == *"Sales Overview"* ]]
+}
+
+@test "accepts Korean assertion heading (ends with 다)" {
+  cat > "$SLIDES" <<'EOF'
+---
+marp: true
+---
+<style>section { font-size: 24pt; }</style>
+
+## Q3 매출이 전년비 23% 성장했다
+
+- 증거 [1]
+EOF
+  run python3 "$SCRIPT" "$SLIDES"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'"heading_noun_phrase"'* ]]
+}
+
+@test "accepts English assertion heading (has verb)" {
+  cat > "$SLIDES" <<'EOF'
+---
+marp: true
+---
+<style>section { font-size: 24pt; }</style>
+
+## Revenue grew 23% year over year
+
+- evidence [1]
+EOF
+  run python3 "$SCRIPT" "$SLIDES"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'"heading_noun_phrase"'* ]]
+}
+
+@test "section.sources class is a declared exception (warning, not violation)" {
+  cat > "$SLIDES" <<'EOF'
+---
+marp: true
+---
+<style>section { font-size: 24pt; } section.sources { font-size: 14pt; }</style>
+
+<!-- _class: sources -->
+
+# Sources
+
+1. a
+2. b
+3. c
+4. d
+5. e
+6. f
+7. g
+EOF
+  run python3 "$SCRIPT" "$SLIDES"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"sources_class_exception"'* ]]
+  [[ "$output" != *'"bullets_over_max"'* ]]
+}
+
+@test "flags body font-size under 24pt" {
+  cat > "$SLIDES" <<'EOF'
+---
+marp: true
+---
+<style>section { font-size: 18pt; }</style>
+
+## 본문 14pt는 가독성 하한을 깬다
+
+- a
+EOF
+  run python3 "$SCRIPT" "$SLIDES"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"body_font_under_min"'* ]]
+}
+
+@test "flags slide count over 25" {
+  # 26 minimal slides
+  {
+    echo "---"
+    echo "marp: true"
+    echo "---"
+    echo "<style>section { font-size: 24pt; }</style>"
+    for i in $(seq 1 26); do
+      echo
+      echo "---"
+      echo
+      echo "## 슬라이드 ${i}는 테스트 대상이다"
+      echo "- x"
+    done
+  } > "$SLIDES"
+  run python3 "$SCRIPT" "$SLIDES"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"slide_count_over_max"'* ]]
+}
+
+@test "flags more than 2 font families loaded" {
+  cat > "$SLIDES" <<'EOF'
+---
+marp: true
+---
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk&family=Inter&family=Fraunces" rel="stylesheet">
+<style>section { font-size: 24pt; }</style>
+
+## 3개 폰트는 너무 많다
+
+- a
+EOF
+  run python3 "$SCRIPT" "$SLIDES"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"too_many_font_families"'* ]]
+}
+
+@test "missing file exits 2" {
+  run python3 "$SCRIPT" /nonexistent/path.md
+  [ "$status" -eq 2 ]
+}
