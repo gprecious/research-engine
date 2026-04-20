@@ -79,7 +79,7 @@ If not configured, `/research` silently skips the Notion step and continues with
 
 `/research-visualize <slug>` post-processes a completed session into data charts (QuickChart PNG, default), Mermaid diagrams (`--diagrams`), and Marp slide decks (`--slides`). Outputs land under `research/<slug>/figures/` and `research/<slug>/slides.*`. The README gains a `<!-- viz:begin --> ... <!-- viz:end -->` block that's safe to re-run (idempotent).
 
-When Notion is configured, the final stage auto-pushes the patched README back to Notion (mirroring Mermaid blocks natively; chart `![](figures/...)` references are ignored by the existing `md_to_blocks` parser, so the Notion page stays clean). Pass `--no-sync-notion` to skip.
+When Notion is configured, the final stage auto-pushes the patched README back to Notion. Chart PNGs are mirrored as Notion image blocks backed by their QuickChart URLs (the URL is stored in each chart's `.meta.json` and reused, so no file upload is needed). Mermaid blocks render natively. Pass `--no-sync-notion` to skip.
 
 ## Requirements
 

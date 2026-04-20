@@ -13,10 +13,11 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 - Bats tests: `test_load_session.bats`, `test_patch_readme.bats`, `test_render_chart.bats`.
 - `tests/fixtures/sample-session/` fixture for unit tests.
 - README viz block is idempotent (marker-bounded) so re-runs don't drift.
-- Notion: `/research-visualize` now auto-pushes the patched README to Notion by default (Mermaid blocks rendered natively; chart `![](figures/...)` references are ignored by the parser so the page stays clean). Pass `--no-sync-notion` to opt out.
+- Notion: `/research-visualize` now auto-pushes the patched README to Notion by default. Pass `--no-sync-notion` to opt out.
+- Notion: chart PNGs referenced as `![](figures/chart-NN-*.png)` are mirrored as Notion `image` blocks backed by the QuickChart URL stored in each chart's `.meta.json` — no file upload, no external host needed. Mermaid blocks continue to render natively.
+- `scripts/push_to_notion.sh`: `md_to_blocks` parser extended with `NOTION_MD_BASE_DIR`-aware image resolution (local PNG + adjacent `.meta.json` → external image block).
 
 ### Notes
-- Chart PNG upload to Notion is deliberately out of scope for 0.3.0 (v2 follow-up).
 - `/research` main pipeline and adapter contract are unchanged.
 
 ## 0.2.0 — 2026-04-18

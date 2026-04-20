@@ -99,12 +99,17 @@ _api() {
 # keeping stdin free for the markdown input. An inline `python3 - <<PYEOF`
 # heredoc would hijack stdin and leave the markdown unread.
 PY_MD_TO_BLOCKS=$(cat <<'PYEOF'
-import json, re, sys
+import json, os, re, sys
 md = sys.stdin.read()
 blocks = []
 in_code = False
 code_lang = "plain text"
 code_buf = []
+
+# Image resolution context: if set, standalone ![alt](path) lines pointing at
+# a local PNG whose neighbor .meta.json has a quickchart_url become Notion
+# image blocks backed by that external URL (no file upload needed).
+BASE_DIR = os.environ.get("NOTION_MD_BASE_DIR", "").strip() or None
 
 def rtext(s):
     out = []
@@ -124,6 +129,35 @@ def flush_code():
         })
     code_buf = []; code_lang = "plain text"; in_code = False
 
+def try_image_block(line):
+    # Standalone image line: ![alt](path)  — no surrounding text.
+    m = re.match(r"^\s*!\[([^\]]*)\]\(([^)]+)\)\s*$", line)
+    if not m:
+        return None
+    alt = m.group(1).strip()
+    path = m.group(2).strip()
+    # Remote URL: use directly.
+    if path.startswith("http://") or path.startswith("https://"):
+        return {"object":"block","type":"image","image":{"type":"external","external":{"url":path},"caption": rtext(alt) if alt else []}}
+    # Local path: resolve via BASE_DIR and look up the adjacent .meta.json.
+    if not BASE_DIR:
+        return None
+    abs_png = os.path.normpath(os.path.join(BASE_DIR, path))
+    if not abs_png.endswith(".png"):
+        return None
+    meta_path = abs_png[:-4] + ".meta.json"
+    if not os.path.isfile(meta_path):
+        return None
+    try:
+        with open(meta_path, "r", encoding="utf-8") as f:
+            meta = json.load(f)
+        url = (meta.get("quickchart_url") or "").strip()
+    except Exception:
+        return None
+    if not url or len(url) > 2000:
+        return None
+    return {"object":"block","type":"image","image":{"type":"external","external":{"url":url},"caption": rtext(alt) if alt else []}}
+
 NOTION_LANGS = {"abap","arduino","bash","basic","c","clojure","coffeescript","c++","c#","css","dart","diff","docker","elixir","elm","erlang","flow","fortran","f#","gherkin","glsl","go","graphql","groovy","haskell","html","java","javascript","json","julia","kotlin","latex","less","lisp","livescript","lua","makefile","markdown","markup","matlab","mermaid","nix","objective-c","ocaml","pascal","perl","php","plain text","powershell","prolog","protobuf","python","r","reason","ruby","rust","sass","scala","scheme","scss","shell","solidity","sql","swift","typescript","vb.net","verilog","vhdl","visual basic","webassembly","xml","yaml"}
 
 for line in md.splitlines():
@@ -138,6 +172,10 @@ for line in md.splitlines():
         in_code = True
         code_lang = (m.group(1) or "plain text")
         if code_lang not in NOTION_LANGS: code_lang = "plain text"
+        continue
+    img = try_image_block(line)
+    if img is not None:
+        blocks.append(img)
         continue
     if line.startswith("### "):
         blocks.append({"object":"block","type":"heading_3","heading_3":{"rich_text":rtext(line[4:])}})
@@ -404,7 +442,7 @@ else
 fi
 
 # ----- Build consolidated body -----
-BODY_BLOCKS="$(md_to_blocks < "$REPORT_DIR/README.md" 2>/dev/null || echo '[]')"
+BODY_BLOCKS="$(NOTION_MD_BASE_DIR="$REPORT_DIR" md_to_blocks < "$REPORT_DIR/README.md" 2>/dev/null || echo '[]')"
 
 # Divider + "부속 자료" heading before the toggles (if any attachment exists)
 HAS_ATTACH=0
