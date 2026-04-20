@@ -77,7 +77,7 @@ Then run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/render_slides.sh" "$report_dir/sli
 
 ### Stage V5.1 — Lint slides.md (only with --slides)
 
-Immediately after Stage V5 writes `slides.md`, run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/lint_slides.py" "$report_dir/slides.md" > "$report_dir/lint.json"`. The linter exits 0 regardless of findings — it's advisory.
+Immediately after Stage V5 writes `slides.md`, run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/lint_slides.py" "$report_dir/slides.md" "$report_dir/sources.json" > "$report_dir/lint.json"`. Passing `sources.json` as the second arg activates the `source_marker_unresolved` rule — every `[n]` citation in slides.md is verified against the declared sources. The linter exits 0 regardless of findings — it's advisory.
 
 Parse `lint.json`:
 - If `violations[]` is non-empty AND `--judge` is also set, include the violations in the judge dispatch prompt so the judge knows the mechanical rule breaks without re-deriving them.

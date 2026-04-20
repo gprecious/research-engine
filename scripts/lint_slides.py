@@ -3,8 +3,10 @@
 lint_slides.py — deterministic rule check for a visualizer-deck slides.md
 
 Usage:
-  lint_slides.py <slides.md>
+  lint_slides.py <slides.md> [<sources.json>]
 
+When sources.json is provided, every `[n]` marker in slides.md is verified
+against the sources[].n values — unresolved markers become violations.
 Prints a JSON object to stdout; always exits 0 so callers can decide severity.
 
 The rules are the same ones encoded in agents/visualizer-deck.md and
@@ -163,7 +165,35 @@ def extract_first_heading(block: str):
             return m.group(1), m.group(2)
     return None, None
 
-def lint(md_text: str) -> dict:
+def _scan_source_markers(md_text: str):
+    """Return a set of int source ids referenced via `[n]` or `[n,m,...]` in the markdown.
+
+    Only matches whole tokens that are numeric or comma-separated numerics so
+    we don't confuse links like `[label](url)` or markdown image alts.
+    """
+    ids = set()
+    # Match [N] or [N,M,...] where N is an integer. Require a preceding
+    # whitespace / opening punctuation so `[label](url)` is ignored.
+    for m in re.finditer(r"(?:^|[\s\(\[\{,])\[(\d+(?:\s*,\s*\d+)*)\]", md_text):
+        for tok in m.group(1).split(","):
+            tok = tok.strip()
+            if tok.isdigit():
+                ids.add(int(tok))
+    return ids
+
+def _load_source_ids(sources_json_path: str):
+    """Return the set of integer source ids declared in sources.json, or None
+    if the file can't be parsed.
+    """
+    try:
+        with open(sources_json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return None
+    sources = data.get("sources") or []
+    return { int(s.get("n")) for s in sources if s.get("n") is not None }
+
+def lint(md_text: str, sources_json_path: str | None = None) -> dict:
     violations = []
     warnings = []
     layout_classes = []
@@ -237,6 +267,25 @@ def lint(md_text: str) -> dict:
                     "detail": f"'{heading}' reads as a label, not an assertion"
                 })
 
+    referenced_ids = _scan_source_markers(md_text)
+
+    if sources_json_path:
+        declared = _load_source_ids(sources_json_path)
+        if declared is None:
+            warnings.append({
+                "slide": None,
+                "rule": "sources_json_unreadable",
+                "detail": f"could not parse {sources_json_path}; skipping [n]-marker resolution"
+            })
+        else:
+            unresolved = sorted(referenced_ids - declared)
+            for n in unresolved:
+                violations.append({
+                    "slide": None,
+                    "rule": "source_marker_unresolved",
+                    "detail": f"[{n}] referenced in slides but not declared in sources.json"
+                })
+
     return {
         "slide_count": slide_count,
         "violations": violations,
@@ -247,18 +296,20 @@ def lint(md_text: str) -> dict:
             "words_max_on_any_slide": words_hi,
             "body_font_size_pt": body_pt,
             "font_families_declared": n_families,
+            "source_markers_referenced": sorted(referenced_ids),
         },
     }
 
 def main():
-    if len(sys.argv) != 2:
-        print("usage: lint_slides.py <slides.md>", file=sys.stderr)
+    if len(sys.argv) not in (2, 3):
+        print("usage: lint_slides.py <slides.md> [<sources.json>]", file=sys.stderr)
         sys.exit(2)
     slides = Path(sys.argv[1])
     if not slides.is_file():
         print(f"lint_slides: file not found: {slides}", file=sys.stderr)
         sys.exit(2)
-    result = lint(slides.read_text(encoding="utf-8"))
+    sources_path = sys.argv[2] if len(sys.argv) == 3 else None
+    result = lint(slides.read_text(encoding="utf-8"), sources_path)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 if __name__ == "__main__":

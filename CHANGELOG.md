@@ -3,6 +3,17 @@
 All notable changes to research-engine.
 Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
+## 0.6.1 — 2026-04-20
+
+### Added
+- `scripts/lint_slides.py` now accepts an optional 2nd arg `<sources.json>`. When provided, every `[n]` citation marker in slides.md is resolved against the declared sources — unresolved markers become `source_marker_unresolved` violations. Catches the exact regression `visualizer-judge` flagged on the v2 deck (13 missing entries).
+- `/research-visualize` Stage V5.1 now forwards `$report_dir/sources.json` to the linter so marker resolution runs automatically on every deck render.
+- 5 new bats tests for the rule: clean resolution, unresolved marker, grouped `[1,2,3]` markers, markdown-link `[label](url)` NOT misidentified as a marker, malformed sources.json degrades to warning.
+
+### Notes
+- Marker detection requires a preceding whitespace/punctuation boundary so markdown links like `[robonuggets/marp-slides](https://...)` never match. Only numeric tokens or comma-lists inside `[...]` trigger the rule.
+- Linter now reports `stats.source_markers_referenced` — the sorted list of unique ids actually cited in the deck.
+
 ## 0.6.0 — 2026-04-20
 
 ### Added

@@ -225,3 +225,113 @@ EOF
   run python3 "$SCRIPT" /nonexistent/path.md
   [ "$status" -eq 2 ]
 }
+
+@test "source marker resolution: zero violations when every [n] exists" {
+  cat > "$SLIDES" <<'EOF'
+---
+marp: true
+---
+<style>section { font-size: 24pt; }</style>
+
+## 본문 24pt는 2026 기본선이다
+
+- 근거 1 [1]
+- 근거 2 [3]
+EOF
+  cat > "$TMPDIR_T/sources.json" <<'EOF'
+{ "sources": [
+  { "n": 1, "title": "a", "url": "https://a" },
+  { "n": 2, "title": "b", "url": "https://b" },
+  { "n": 3, "title": "c", "url": "https://c" }
+] }
+EOF
+  run python3 "$SCRIPT" "$SLIDES" "$TMPDIR_T/sources.json"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"source_marker_unresolved"* ]]
+  [[ "$output" == *'"source_markers_referenced": ['* ]]
+}
+
+@test "source marker resolution: flags [n] missing from sources.json" {
+  cat > "$SLIDES" <<'EOF'
+---
+marp: true
+---
+<style>section { font-size: 24pt; }</style>
+
+## 본문 24pt는 2026 기본선이다
+
+- 근거 1 [1]
+- 근거 2 [99]
+EOF
+  cat > "$TMPDIR_T/sources.json" <<'EOF'
+{ "sources": [
+  { "n": 1, "title": "a", "url": "https://a" }
+] }
+EOF
+  run python3 "$SCRIPT" "$SLIDES" "$TMPDIR_T/sources.json"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"source_marker_unresolved"'* ]]
+  [[ "$output" == *"[99]"* ]]
+}
+
+@test "source marker resolution: handles grouped markers [1,2,3]" {
+  cat > "$SLIDES" <<'EOF'
+---
+marp: true
+---
+<style>section { font-size: 24pt; }</style>
+
+## 본문 24pt는 2026 기본선이다
+
+- 근거 묶음 [1,2,99]
+EOF
+  cat > "$TMPDIR_T/sources.json" <<'EOF'
+{ "sources": [
+  { "n": 1, "title": "a", "url": "https://a" },
+  { "n": 2, "title": "b", "url": "https://b" }
+] }
+EOF
+  run python3 "$SCRIPT" "$SLIDES" "$TMPDIR_T/sources.json"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[99]"* ]]
+  # [1] and [2] are valid — must not appear as unresolved
+  # This line asserts the specific unresolved detail only contains 99.
+  [[ "$output" != *'"[1] referenced'* ]]
+}
+
+@test "source marker resolution: markdown link [label](url) not misidentified as a marker" {
+  cat > "$SLIDES" <<'EOF'
+---
+marp: true
+---
+<style>section { font-size: 24pt; }</style>
+
+## Sources slide 스타일을 확정한다
+
+1. [robonuggets/marp-slides](https://github.com/robonuggets/marp-slides) — 22 예제
+EOF
+  cat > "$TMPDIR_T/sources.json" <<'EOF'
+{ "sources": [] }
+EOF
+  run python3 "$SCRIPT" "$SLIDES" "$TMPDIR_T/sources.json"
+  [ "$status" -eq 0 ]
+  # The label `robonuggets/marp-slides` is NOT a numeric marker and must not trigger the rule.
+  [[ "$output" != *"source_marker_unresolved"* ]]
+}
+
+@test "malformed sources.json becomes a warning, not a violation" {
+  cat > "$SLIDES" <<'EOF'
+---
+marp: true
+---
+<style>section { font-size: 24pt; }</style>
+
+## 본문 24pt는 2026 기본선이다
+
+- 근거 [1]
+EOF
+  echo "{ not json" > "$TMPDIR_T/broken.json"
+  run python3 "$SCRIPT" "$SLIDES" "$TMPDIR_T/broken.json"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"sources_json_unreadable"* ]]
+}
