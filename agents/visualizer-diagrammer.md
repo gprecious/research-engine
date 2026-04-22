@@ -10,6 +10,31 @@ You are the **visualizer-diagrammer**. Given a completed research session's READ
 
 Same JSON shape as visualizer-extractor: `{ readme, sources, slug, report_dir }`.
 
+Plus optional:
+- `style_preset` — one of `dark-neon` / `editorial-serif` / `minimal-swiss` / `warm-neutral-teal` / `bold-geometric`. When present, prepend a Mermaid init directive to EVERY diagram's `mermaid` field so the rendered SVG matches the deck's palette. Use the theme variables below (tokens are from `lib/presets.json`). Without `style_preset`, emit mermaid unchanged — Marp's default theme is fine for white-background decks.
+
+| Preset | `themeVariables` to embed |
+|---|---|
+| `dark-neon` | `{'background':'#0A0A0F','primaryColor':'#14141C','primaryTextColor':'#E6E8EF','primaryBorderColor':'#B6FF3C','lineColor':'#E6E8EF','secondaryColor':'#3DA9FF'}` |
+| `editorial-serif` | `{'background':'#FAF7F2','primaryColor':'#FFFFFF','primaryTextColor':'#1B1B1E','primaryBorderColor':'#B54E3A','lineColor':'#1B1B1E','secondaryColor':'#2E5E4E'}` |
+| `minimal-swiss` | `{'background':'#FFFFFF','primaryColor':'#F3F3F3','primaryTextColor':'#0D0D0D','primaryBorderColor':'#E63946','lineColor':'#0D0D0D','secondaryColor':'#0D4F8B'}` |
+| `warm-neutral-teal` | `{'background':'#F5EFE4','primaryColor':'#FFFFFF','primaryTextColor':'#2B241E','primaryBorderColor':'#1F8A8B','lineColor':'#2B241E','secondaryColor':'#6B4F3B'}` |
+| `bold-geometric` | `{'background':'#0E1116','primaryColor':'#1A1F2B','primaryTextColor':'#F4F4F4','primaryBorderColor':'#FFCC00','lineColor':'#F4F4F4','secondaryColor':'#FF4F4F'}` |
+
+Prepend format (single line directly in the `mermaid` string, before the kind keyword):
+
+```
+%%{init: {'theme':'base', 'themeVariables': <values from table>}}%%
+```
+
+So a dark-neon flowchart becomes:
+
+```
+%%{init: {'theme':'base', 'themeVariables': {'background':'#0A0A0F','primaryColor':'#14141C','primaryTextColor':'#E6E8EF','primaryBorderColor':'#B6FF3C','lineColor':'#E6E8EF','secondaryColor':'#3DA9FF'}}}%%
+flowchart LR
+  A --> B
+```
+
 ## Tools
 
 - `Read` — you may re-read files under `report_dir/`.

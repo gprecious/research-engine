@@ -1,6 +1,6 @@
 ---
-description: Generate charts, optional Mermaid diagrams, and optional Marp slides for an existing research session.
-argument-hint: "[<slug>] [--slides] [--diagrams] [--fresh] [--no-sync-notion]"
+description: Generate charts, optional Mermaid diagrams, optional example-image gallery, and optional Marp slides for an existing research session.
+argument-hint: "[<slug>] [--slides] [--diagrams] [--images] [--images-strategies <list>] [--judge] [--preset <name>] [--brand-image <url>] [--fresh] [--no-sync-notion]"
 allowed-tools: Bash, Read, Write, Edit, Agent, Glob, Grep
 ---
 
@@ -10,6 +10,11 @@ allowed-tools: Bash, Read, Write, Edit, Agent, Glob, Grep
 - positional `slug` (optional; if absent, use the most recent session)
 - `--slides` — also generate `slides.md` + `.pptx` + `.pdf`
 - `--diagrams` — also generate Mermaid diagrams in the README viz block
+- `--images` — also produce example / illustrative images (per-chapter frames for YouTube inputs; direct-gen or web-search fallbacks otherwise). See Stage V3.5.
+- `--images-strategies <list>` — comma-separated subset of `youtube_frame,direct_gen,web_search`. Default: `youtube_frame,direct_gen,web_search` (all allowed; availability is further gated by input_type + configured backends). Example: `--images-strategies youtube_frame` limits to video frames only.
+- `--judge` — after building slides, score the deck against the 4-axis rubric and, if <75, automatically regenerate once applying the judge's fix-list (requires `--slides`)
+- `--preset <name>` — force both charts and deck to use one of the 5 named style presets from `lib/style_presets.md` (`dark-neon` / `editorial-serif` / `minimal-swiss` / `warm-neutral-teal` / `bold-geometric`). Without the flag, charts render on white + Okabe-Ito and the deck agent infers its own preset — which can visually disagree with the charts.
+- `--brand-image <url>` — forwarded to `render_chart.sh --brand-image`. Injects QuickChart's `backgroundImageUrl` plugin so every chart is rendered on top of the supplied watermark/brand image. URL must be publicly reachable by QuickChart.
 - `--fresh` — wipe and regenerate `figures/`, `slides.*`, and replace the README viz block
 - `--no-sync-notion` — skip the auto-push to Notion at the end of the pipeline
 
@@ -29,7 +34,7 @@ allowed-tools: Bash, Read, Write, Edit, Agent, Glob, Grep
 ### Stage V2 — Handle --fresh
 
 If `--fresh`:
-- `rm -rf "$report_dir/figures"` and `rm -f "$report_dir/slides.md" "$report_dir/slides.pptx" "$report_dir/slides.pdf"`.
+- `rm -rf "$report_dir/figures"` and `rm -f "$report_dir/slides.md" "$report_dir/slides.pptx" "$report_dir/slides.pdf" "$report_dir/images.json"`. `figures/` is shared by charts (PNG) and example images (JPG/PNG) — wiping it forces both pipelines to regenerate.
 - Leave the existing marker block in README.md in place. Stage V6 below will overwrite its contents via `patch_readme.sh`. If Stage V6 ends up with empty content (no charts AND no diagrams), use a small Python one-liner to strip the marker block entirely:
 
 ```bash
@@ -57,20 +62,74 @@ Parse the first fenced JSON block from the reply with `jq`. Extract `charts[]` a
 
 1. Compute `NN` (zero-padded index 01..05) and `<short>` = `bash "${CLAUDE_PLUGIN_ROOT}/scripts/slugify.sh" "<chart.title>"` (slugify.sh caps at 40 chars — fine).
 2. Write the spec JSON to a tempfile via `mktemp`.
-3. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/render_chart.sh" "$tempfile" "$report_dir/figures/chart-NN-<short>.png"`. This call both fetches the PNG and writes the adjacent `chart-NN-<short>.meta.json` (which preserves the spec for reproducibility).
+3. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/render_chart.sh" [--preset "$preset"] [--brand-image "$brand_image"] "$tempfile" "$report_dir/figures/chart-NN-<short>.png"`. Forward `--preset` when the command flag is set. If `--preset` is absent AND `--slides` is present, run `scripts/pick_preset.py` on `README.md` FIRST (before Stage V3 starts) so the auto-picked preset is forwarded to every chart render — charts and deck then share a single preset end-to-end. Also forward `--brand-image` when set. Render auto-switches to POST /chart when the encoded Chart.js config exceeds ~1900 chars. meta.json preserves the spec, chosen preset, brand image, and render method for reproducibility.
 4. Delete the tempfile.
 5. On success: record `{id, title, png_rel: "figures/chart-NN-<short>.png"}` into `charts_rendered[]` and read `source_ids` from the just-written meta.json.
 6. On failure (non-zero exit from render_chart.sh): append `{chart_id, error}` to `failures_charts[]` and continue.
 
+### Stage V3.5 — Example images (only with --images)
+
+Produces example / illustrative images that get embedded in the README and pushed to Notion as inline image blocks (via `push_to_notion.sh`'s file-upload path). Three strategies, gated by `--images-strategies` and by input type / configured backends:
+
+1. **`youtube_frame`** — only valid when `sources.json.input_type == "youtube"`. Extracts real frames from the cached source video at chapter midpoints (or custom timestamps).
+2. **`direct_gen`** — delegates to `scripts/gen_image.sh` which dispatches to a Replicate model (if `IMAGEGEN_REPLICATE_TOKEN` + `IMAGEGEN_REPLICATE_MODEL` are set) or a user-supplied shell fragment (`IMAGEGEN_CLAUDE_CMD`). No backend configured → this strategy is skipped silently.
+3. **`web_search`** — currently stubbed; the orchestrator records each `web_search` item in `images.json.failures[]` with `error: "web_search_not_implemented"`. Reserved for firecrawl-backed image retrieval.
+
+#### Steps
+
+1. Compute `allowed_strategies`: start from `--images-strategies` (default all three), then drop any strategy that can't run:
+   - `youtube_frame` dropped if `input_type != "youtube"` or `cache/<video_id>.mp4` missing and no metadata to redownload.
+   - `direct_gen` dropped if `scripts/gen_image.sh` exits 3 on a dummy `--prompt "probe" --out /tmp/.probe.png` health check (no backend configured).
+   - `web_search` always dropped until implemented.
+2. Dispatch `agents/visualizer-imager.md` as a single Agent call with inputs `{readme, sources, slug, report_dir, input_type, youtube_meta, allow_strategies}`. `youtube_meta` is derived from `cache/metadata.json` (chapters + video_id + duration) when present. Parse the first fenced JSON block.
+3. For each returned image spec, dispatch to the appropriate backend and write `<report_dir>/figures/<filename>` where `<filename>` follows the `frame-NN-<slug>.jpg` or `image-NN-<slug>.png` convention:
+   - `youtube_frame` → collect all into a temp spec file and invoke `scripts/extract_yt_frames.sh <video_id> <cache_dir> <figures_dir> <spec>`. Parse its JSON output.
+   - `direct_gen`    → call `scripts/gen_image.sh --prompt "<prompt>" --out <figures_dir>/image-NN-<slug>.png [--aspect <aspect>]`. A non-zero exit records a failure and moves on.
+   - `web_search`    → record failure `{error: "web_search_not_implemented"}`.
+4. Build `images_rendered[]` entries: `{id, section, alt, strategy, path_rel, source_ids, evidence_quote}`.
+5. Patch the README to insert each image **inline under its `### <section>` heading** in the "## 챕터별 요약" section (or, for non-YouTube inputs, under a new `## 시각 예시` section appended after "## 상세 분석"). A standalone `![alt](path_rel)` line is the only form; `push_to_notion.sh` looks for that exact pattern.
+6. Persist `images_rendered[]` and failures under `$report_dir/images.json` for reproducibility.
+7. Idempotency: if an image at the target path already exists and `--fresh` is not set, reuse it (skip the backend call) but still include it in `images_rendered[]`.
+
 ### Stage V4 — Extract diagrams (only with --diagrams)
 
-Dispatch `agents/visualizer-diagrammer.md`. Parse `diagrams[]`. Keep the raw mermaid text in memory for the patch step.
+Dispatch `agents/visualizer-diagrammer.md` with inputs `{readme, sources, slug, report_dir, style_preset: "<resolved_preset>"}` — the resolved preset from Stage V5 (or, if Stage V5 hasn't resolved it yet, run `pick_preset.py` here as a one-shot) so Mermaid diagrams visually match the deck palette. Parse `diagrams[]`. Keep the raw mermaid text in memory for the patch step.
 
 ### Stage V5 — Build slide deck (only with --slides)
 
-Dispatch `agents/visualizer-deck.md` with inputs that include the already-rendered `charts_rendered[]` and (if present) `diagrams[]`. Receive the `slides.md` content (inside a fenced `markdown` block). Write it to `$report_dir/slides.md`.
+Determine the effective style preset:
+1. If `--preset <name>` was passed, use that.
+2. Otherwise, run `preset=$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pick_preset.py" "$report_dir/README.md")` and use its output. The picker is deterministic and grounded in content keywords — this replaces the deck agent's Step-1 inference with a reproducible choice.
+3. Record the chosen preset in `viz.json.flags.preset` regardless of source (`--preset` flag, picker, or `null` if the user disabled both, though that path isn't currently exposed).
+
+Dispatch `agents/visualizer-deck.md` with inputs that include the already-rendered `charts_rendered[]`, (if present) `diagrams[]`, and `"style_preset": "<resolved_preset>"`. The deck agent must use that preset verbatim — Step 1 inference is only a fallback when `style_preset` is absent from the inputs. Receive the `slides.md` content (inside a fenced `markdown` block). Write it to `$report_dir/slides.md`.
 
 Then run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/render_slides.sh" "$report_dir/slides.md"`. On non-zero exit, record `{error: "marp_failed"}` in `failures_slides[]` but keep going.
+
+### Stage V5.1 — Lint slides.md (only with --slides)
+
+Immediately after Stage V5 writes `slides.md`, run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/lint_slides.py" "$report_dir/slides.md" "$report_dir/sources.json" > "$report_dir/lint.json"`. Passing `sources.json` as the second arg activates the `source_marker_unresolved` rule — every `[n]` citation in slides.md is verified against the declared sources. The linter exits 0 regardless of findings — it's advisory.
+
+Parse `lint.json`:
+- If `violations[]` is non-empty AND `--judge` is also set, include the violations in the judge dispatch prompt so the judge knows the mechanical rule breaks without re-deriving them.
+- If `violations[]` is non-empty AND `--judge` is NOT set, log them to stdout as `viz: lint flagged N violation(s) — consider --judge for auto-refine`.
+- `warnings[]` (declared exceptions like `section.sources`) are informational only; never escalated.
+
+The linter catches mechanical rule breaks (bullets/words/slide count, body-size, font-family count, noun-phrase headings) BEFORE the expensive judge dispatch — the judge can focus on the subjective axes (Design Quality, Originality) instead.
+
+### Stage V5.5 — Judge (only with --judge, requires --slides)
+
+If `--judge` was passed and Stage V5 wrote a `slides.md`:
+
+1. Dispatch `agents/visualizer-judge.md` as a single Agent call with inputs `{slides_md, pptx_path, pdf_path, readme, charts: charts_rendered, slug, report_title}`. The judge returns a single fenced JSON block per its output schema.
+2. Parse with `jq`. Extract `verdict`, `total`, `scores`, `fixes[]`.
+3. Persist the verdict as `$report_dir/judge.json`.
+4. If `verdict == "FAIL"` AND this is the first judge pass of the run:
+   - Dispatch `agents/visualizer-deck.md` a second time with an additional `fixes` field in its input (`{...original_input, fixes: <array from judge>}`). The deck agent must apply every fix — do not cherry-pick.
+   - Overwrite `$report_dir/slides.md` with the new content.
+   - Re-run `render_slides.sh`.
+   - Re-dispatch the judge on the new deck to produce the final `judge.json`. Do NOT loop a third time — two passes is the hard cap (matches the daymade/ppt-creator precedent and prevents infinite grind).
+5. On judge dispatch failure (non-JSON reply, dispatch error), record `{error: "judge_failed", detail: "..."}` in `failures_slides[]` but keep the original `slides.md`.
 
 ### Stage V6 — Build viz block and patch README
 
@@ -114,12 +173,15 @@ Write `$report_dir/viz.json`:
 {
   "slug": "...",
   "generated_at": "<ISO>",
-  "flags": { "slides": true, "diagrams": false, "fresh": false },
+  "flags": { "slides": true, "diagrams": false, "images": false, "images_strategies": ["youtube_frame"], "judge": false, "preset": "dark-neon|null", "brand_image": "url|null", "fresh": false },
   "charts": [ { "id": "c1", "title": "...", "png_rel": "figures/..." } ],
   "diagrams": [ { "id": "d1", "title": "...", "placement": "...", "evidence_src_ids": [1,2] } ],
+  "images": [ { "id": "i1", "section": "Affordances & Signifiers", "strategy": "youtube_frame", "path_rel": "figures/frame-01-...jpg", "source_ids": [1] } ],
   "slides": { "md": "slides.md", "pptx": "slides.pptx|null", "pdf": "slides.pdf|null" },
+  "judge": { "verdict": "PASS|FAIL|null", "total": 0, "passes": 0, "file": "judge.json|null" },
+  "lint":  { "violations": 0, "warnings": 1, "file": "lint.json|null" },
   "rejected_charts": [ ... ],
-  "failures": { "charts": [...], "slides": [...] }
+  "failures": { "charts": [...], "slides": [...], "images": [...] }
 }
 ```
 
@@ -133,11 +195,12 @@ Unless `--no-sync-notion` was passed:
 
 ### Stage V9 — Final message
 
-Print a two- or three-line summary:
+Print a two- to four-line summary:
 
 - Line 1: paths (README.md, any generated `slides.*`, count of figures).
 - Line 2: `viz.json` path + failure count (or "no failures").
-- Line 3 (when pushed): `📒 Notion: <url>` from `sources.json.output_notion_url`.
+- Line 3 (when `--judge` was used): `🧑‍⚖️ Judge: <verdict> (<total>/100 after <passes> pass(es))`.
+- Line 4 (when pushed): `📒 Notion: <url>` from `sources.json.output_notion_url`.
 
 ## Idempotency
 
