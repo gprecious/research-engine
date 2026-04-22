@@ -1,6 +1,6 @@
 ---
-description: Generate charts, optional Mermaid diagrams, and optional Marp slides for an existing research session.
-argument-hint: "[<slug>] [--slides] [--diagrams] [--judge] [--preset <name>] [--brand-image <url>] [--fresh] [--no-sync-notion]"
+description: Generate charts, optional Mermaid diagrams, optional example-image gallery, and optional Marp slides for an existing research session.
+argument-hint: "[<slug>] [--slides] [--diagrams] [--images] [--images-strategies <list>] [--judge] [--preset <name>] [--brand-image <url>] [--fresh] [--no-sync-notion]"
 allowed-tools: Bash, Read, Write, Edit, Agent, Glob, Grep
 ---
 
@@ -10,6 +10,8 @@ allowed-tools: Bash, Read, Write, Edit, Agent, Glob, Grep
 - positional `slug` (optional; if absent, use the most recent session)
 - `--slides` — also generate `slides.md` + `.pptx` + `.pdf`
 - `--diagrams` — also generate Mermaid diagrams in the README viz block
+- `--images` — also produce example / illustrative images (per-chapter frames for YouTube inputs; direct-gen or web-search fallbacks otherwise). See Stage V3.5.
+- `--images-strategies <list>` — comma-separated subset of `youtube_frame,direct_gen,web_search`. Default: `youtube_frame,direct_gen,web_search` (all allowed; availability is further gated by input_type + configured backends). Example: `--images-strategies youtube_frame` limits to video frames only.
 - `--judge` — after building slides, score the deck against the 4-axis rubric and, if <75, automatically regenerate once applying the judge's fix-list (requires `--slides`)
 - `--preset <name>` — force both charts and deck to use one of the 5 named style presets from `lib/style_presets.md` (`dark-neon` / `editorial-serif` / `minimal-swiss` / `warm-neutral-teal` / `bold-geometric`). Without the flag, charts render on white + Okabe-Ito and the deck agent infers its own preset — which can visually disagree with the charts.
 - `--brand-image <url>` — forwarded to `render_chart.sh --brand-image`. Injects QuickChart's `backgroundImageUrl` plugin so every chart is rendered on top of the supplied watermark/brand image. URL must be publicly reachable by QuickChart.
@@ -32,7 +34,7 @@ allowed-tools: Bash, Read, Write, Edit, Agent, Glob, Grep
 ### Stage V2 — Handle --fresh
 
 If `--fresh`:
-- `rm -rf "$report_dir/figures"` and `rm -f "$report_dir/slides.md" "$report_dir/slides.pptx" "$report_dir/slides.pdf"`.
+- `rm -rf "$report_dir/figures"` and `rm -f "$report_dir/slides.md" "$report_dir/slides.pptx" "$report_dir/slides.pdf" "$report_dir/images.json"`. `figures/` is shared by charts (PNG) and example images (JPG/PNG) — wiping it forces both pipelines to regenerate.
 - Leave the existing marker block in README.md in place. Stage V6 below will overwrite its contents via `patch_readme.sh`. If Stage V6 ends up with empty content (no charts AND no diagrams), use a small Python one-liner to strip the marker block entirely:
 
 ```bash
@@ -64,6 +66,30 @@ Parse the first fenced JSON block from the reply with `jq`. Extract `charts[]` a
 4. Delete the tempfile.
 5. On success: record `{id, title, png_rel: "figures/chart-NN-<short>.png"}` into `charts_rendered[]` and read `source_ids` from the just-written meta.json.
 6. On failure (non-zero exit from render_chart.sh): append `{chart_id, error}` to `failures_charts[]` and continue.
+
+### Stage V3.5 — Example images (only with --images)
+
+Produces example / illustrative images that get embedded in the README and pushed to Notion as inline image blocks (via `push_to_notion.sh`'s file-upload path). Three strategies, gated by `--images-strategies` and by input type / configured backends:
+
+1. **`youtube_frame`** — only valid when `sources.json.input_type == "youtube"`. Extracts real frames from the cached source video at chapter midpoints (or custom timestamps).
+2. **`direct_gen`** — delegates to `scripts/gen_image.sh` which dispatches to a Replicate model (if `IMAGEGEN_REPLICATE_TOKEN` + `IMAGEGEN_REPLICATE_MODEL` are set) or a user-supplied shell fragment (`IMAGEGEN_CLAUDE_CMD`). No backend configured → this strategy is skipped silently.
+3. **`web_search`** — currently stubbed; the orchestrator records each `web_search` item in `images.json.failures[]` with `error: "web_search_not_implemented"`. Reserved for firecrawl-backed image retrieval.
+
+#### Steps
+
+1. Compute `allowed_strategies`: start from `--images-strategies` (default all three), then drop any strategy that can't run:
+   - `youtube_frame` dropped if `input_type != "youtube"` or `cache/<video_id>.mp4` missing and no metadata to redownload.
+   - `direct_gen` dropped if `scripts/gen_image.sh` exits 3 on a dummy `--prompt "probe" --out /tmp/.probe.png` health check (no backend configured).
+   - `web_search` always dropped until implemented.
+2. Dispatch `agents/visualizer-imager.md` as a single Agent call with inputs `{readme, sources, slug, report_dir, input_type, youtube_meta, allow_strategies}`. `youtube_meta` is derived from `cache/metadata.json` (chapters + video_id + duration) when present. Parse the first fenced JSON block.
+3. For each returned image spec, dispatch to the appropriate backend and write `<report_dir>/figures/<filename>` where `<filename>` follows the `frame-NN-<slug>.jpg` or `image-NN-<slug>.png` convention:
+   - `youtube_frame` → collect all into a temp spec file and invoke `scripts/extract_yt_frames.sh <video_id> <cache_dir> <figures_dir> <spec>`. Parse its JSON output.
+   - `direct_gen`    → call `scripts/gen_image.sh --prompt "<prompt>" --out <figures_dir>/image-NN-<slug>.png [--aspect <aspect>]`. A non-zero exit records a failure and moves on.
+   - `web_search`    → record failure `{error: "web_search_not_implemented"}`.
+4. Build `images_rendered[]` entries: `{id, section, alt, strategy, path_rel, source_ids, evidence_quote}`.
+5. Patch the README to insert each image **inline under its `### <section>` heading** in the "## 챕터별 요약" section (or, for non-YouTube inputs, under a new `## 시각 예시` section appended after "## 상세 분석"). A standalone `![alt](path_rel)` line is the only form; `push_to_notion.sh` looks for that exact pattern.
+6. Persist `images_rendered[]` and failures under `$report_dir/images.json` for reproducibility.
+7. Idempotency: if an image at the target path already exists and `--fresh` is not set, reuse it (skip the backend call) but still include it in `images_rendered[]`.
 
 ### Stage V4 — Extract diagrams (only with --diagrams)
 
@@ -147,14 +173,15 @@ Write `$report_dir/viz.json`:
 {
   "slug": "...",
   "generated_at": "<ISO>",
-  "flags": { "slides": true, "diagrams": false, "judge": false, "preset": "dark-neon|null", "brand_image": "url|null", "fresh": false },
+  "flags": { "slides": true, "diagrams": false, "images": false, "images_strategies": ["youtube_frame"], "judge": false, "preset": "dark-neon|null", "brand_image": "url|null", "fresh": false },
   "charts": [ { "id": "c1", "title": "...", "png_rel": "figures/..." } ],
   "diagrams": [ { "id": "d1", "title": "...", "placement": "...", "evidence_src_ids": [1,2] } ],
+  "images": [ { "id": "i1", "section": "Affordances & Signifiers", "strategy": "youtube_frame", "path_rel": "figures/frame-01-...jpg", "source_ids": [1] } ],
   "slides": { "md": "slides.md", "pptx": "slides.pptx|null", "pdf": "slides.pdf|null" },
   "judge": { "verdict": "PASS|FAIL|null", "total": 0, "passes": 0, "file": "judge.json|null" },
   "lint":  { "violations": 0, "warnings": 1, "file": "lint.json|null" },
   "rejected_charts": [ ... ],
-  "failures": { "charts": [...], "slides": [...] }
+  "failures": { "charts": [...], "slides": [...], "images": [...] }
 }
 ```
 

@@ -155,6 +155,14 @@ code_buf = []
 # image blocks backed by that external URL (no file upload needed).
 BASE_DIR = os.environ.get("NOTION_MD_BASE_DIR", "").strip() or None
 
+# Map of relative-path → file_upload_id for locally-uploaded images (jpg/png/etc.).
+# Populated by the bash side scan_and_upload_md_images() pass. Keys match the
+# markdown reference string verbatim (i.e. "figures/frame-01-foo.jpg").
+try:
+    UPLOAD_MAP = json.loads(os.environ.get("NOTION_MD_UPLOAD_MAP", "") or "{}")
+except Exception:
+    UPLOAD_MAP = {}
+
 def rtext(s):
     out = []
     while s:
@@ -183,6 +191,12 @@ def try_image_block(line):
     # Remote URL: use directly.
     if path.startswith("http://") or path.startswith("https://"):
         return {"object":"block","type":"image","image":{"type":"external","external":{"url":path},"caption": rtext(alt) if alt else []}}
+    # Local path that was pre-uploaded via notion_upload_file (jpg/png/webp/gif).
+    # Keyed by the exact markdown path string — scan_and_upload_md_images must
+    # store the same form.
+    up_id = UPLOAD_MAP.get(path)
+    if up_id:
+        return {"object":"block","type":"image","image":{"type":"file_upload","file_upload":{"id":up_id},"caption": rtext(alt) if alt else []}}
     # Local path: resolve via BASE_DIR and look up the adjacent .meta.json.
     if not BASE_DIR:
         return None
@@ -246,6 +260,59 @@ PYEOF
 )
 
 md_to_blocks() { python3 -c "$PY_MD_TO_BLOCKS"; }
+
+# Scan a markdown file for standalone local image references, upload each one
+# to Notion via notion_upload_file(), and echo a JSON map {rel_path: upload_id}.
+# Remote URLs are left alone. Chart PNGs with adjacent *.meta.json quickchart_url
+# are skipped (they use the external-URL path via try_image_block).
+# Supports jpg / jpeg / png / webp / gif. Skips files >20MB (single-part cap).
+scan_and_upload_md_images() {
+  local md_file="$1" base_dir="$2"
+  [[ -f "$md_file" ]] || { echo '{}'; return 0; }
+  local paths
+  paths="$(python3 - "$md_file" <<'PYEOF'
+import re, sys
+md = open(sys.argv[1], 'r', encoding='utf-8').read()
+seen = set()
+for m in re.finditer(r'^\s*!\[[^\]]*\]\(([^)]+)\)\s*$', md, flags=re.M):
+    p = m.group(1).strip()
+    if p.startswith(('http://','https://')):
+        continue
+    if p in seen:
+        continue
+    seen.add(p)
+    print(p)
+PYEOF
+  )"
+  local map='{}'
+  local rel abs filename ctype upload_id meta qc
+  while IFS= read -r rel; do
+    [[ -z "$rel" ]] && continue
+    abs="$(python3 -c "import os,sys; print(os.path.normpath(os.path.join(sys.argv[1], sys.argv[2])))" "$base_dir" "$rel")"
+    [[ -f "$abs" ]] || { echo "push_to_notion: image not found, skipping: $rel" >&2; continue; }
+    case "${rel,,}" in
+      *.png)        ctype="image/png" ;;
+      *.jpg|*.jpeg) ctype="image/jpeg" ;;
+      *.webp)       ctype="image/webp" ;;
+      *.gif)        ctype="image/gif" ;;
+      *) continue ;;
+    esac
+    # Chart PNG with adjacent quickchart meta → let the quickchart fallback handle it.
+    if [[ "${rel,,}" == *.png ]]; then
+      meta="${abs%.png}.meta.json"
+      if [[ -f "$meta" ]]; then
+        qc="$(jq -r '.quickchart_url // empty' "$meta" 2>/dev/null || true)"
+        [[ -n "$qc" ]] && continue
+      fi
+    fi
+    filename="$(basename "$rel")"
+    echo "push_to_notion: uploading $filename → Notion..." >&2
+    upload_id="$(notion_upload_file "$abs" "$filename" "$ctype")" || { echo "push_to_notion: upload failed for $filename" >&2; continue; }
+    [[ -n "$upload_id" ]] || continue
+    map="$(jq --arg k "$rel" --arg v "$upload_id" '. + {($k): $v}' <<< "$map")"
+  done <<< "$paths"
+  echo "$map"
+}
 
 # Build a toggle block whose children are the parsed blocks of <file>
 # Nested children are limited; large contents are truncated to 95 blocks (Notion cap for inline children).
@@ -399,19 +466,48 @@ find_row_by_slug() {
 }
 
 clear_page_children() {
-  # $1 = page_id; deletes all existing children (archive via DELETE)
-  local page_id="$1" next_cursor="" chunk id
+  # $1 = page_id; archives every existing child.
+  #
+  # We DO NOT paginate with start_cursor here. Notion's cursor points at an
+  # absolute position in the original, pre-deletion list — after we DELETE
+  # (= archive) the first page's blocks, reusing the old cursor can return
+  # duplicate or stale pages, leaving some blocks un-archived. Instead we
+  # keep fetching "page 1" until `results` comes back empty: each call
+  # returns the next 100 still-active blocks from the top.
+  #
+  # Notion throttles at ~3 req/s per integration. Unthrottled delete loops
+  # drop requests silently, which is exactly the symptom that left stale
+  # blocks behind on the previous version. We DELETE with retry + a small
+  # sleep between calls to stay under the rate limit.
+  local page_id="$1" res chunk id count guard=0 status attempts
   while :; do
-    local path="/blocks/${page_id}/children?page_size=100"
-    [[ -n "$next_cursor" ]] && path="${path}&start_cursor=${next_cursor}"
-    local res
-    res="$(_api GET "$path")"
+    res="$(_api GET "/blocks/${page_id}/children?page_size=100")"
     chunk="$(jq -c '.results // []' <<< "$res")"
+    count="$(jq 'length' <<< "$chunk")"
+    (( count == 0 )) && break
     for id in $(jq -r '.[].id' <<< "$chunk"); do
-      _api DELETE "/blocks/${id}" > /dev/null || true
+      attempts=0
+      while (( attempts < 3 )); do
+        status="$(
+          curl -sS -o /dev/null -w '%{http_code}' -X DELETE \
+            "${NOTION_API}/blocks/${id}" \
+            -H "Authorization: Bearer ${NOTION_TOKEN}" \
+            -H "Notion-Version: ${NOTION_VERSION}" || echo 000
+        )"
+        case "$status" in
+          2*) break ;;
+          404|409) break ;;                       # already archived — treat as success
+          429|5*) sleep 1; attempts=$((attempts+1)) ;;   # retryable
+          *)     sleep 0.3; attempts=$((attempts+1)) ;;  # other error — retry a couple of times
+        esac
+      done
+      sleep 0.25  # stay under Notion's ~3 req/s integration cap
     done
-    if [[ "$(jq -r '.has_more' <<< "$res")" != "true" ]]; then break; fi
-    next_cursor="$(jq -r '.next_cursor' <<< "$res")"
+    guard=$((guard+1))
+    if (( guard > 50 )); then
+      echo "push_to_notion: clear_page_children guard tripped — stopping at $guard iterations" >&2
+      break
+    fi
   done
 }
 
@@ -486,7 +582,10 @@ else
 fi
 
 # ----- Build consolidated body -----
-BODY_BLOCKS="$(NOTION_MD_BASE_DIR="$REPORT_DIR" md_to_blocks < "$REPORT_DIR/README.md" 2>/dev/null || echo '[]')"
+# Pre-upload any local image references in README.md (jpg/png/webp/gif) so
+# try_image_block() can render them as Notion file_upload image blocks.
+UPLOAD_MAP="$(scan_and_upload_md_images "$REPORT_DIR/README.md" "$REPORT_DIR")"
+BODY_BLOCKS="$(NOTION_MD_BASE_DIR="$REPORT_DIR" NOTION_MD_UPLOAD_MAP="$UPLOAD_MAP" md_to_blocks < "$REPORT_DIR/README.md" 2>/dev/null || echo '[]')"
 
 # Attach slide deck artifacts produced by /research-visualize --slides.
 # Upload .pptx and .pdf via the file_uploads API and append as file blocks
