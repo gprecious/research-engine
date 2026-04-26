@@ -3,6 +3,11 @@
 All notable changes to research-engine.
 Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
+## [Unreleased]
+
+### Added
+- `/bench` slash command — repeatable mini-bench comparing research-engine vs Claude Code baseline on a 5-topic × 2-mode × N=2 matrix, with LLM-as-judge 5-axis rubric and improvement-opportunities report.
+
 ## 0.8.2 — 2026-04-20
 
 ### Changed

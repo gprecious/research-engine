@@ -59,6 +59,20 @@ Tip: once installed, replace the snapshot in `~/.claude/plugins/cache/research-e
 
 Output lands in `research/YYYY-MM-DD-<slug>/README.md`. When Notion is configured, a consolidated report is also upserted as a row in a `research-engine` database under the configured parent page (one row per session, re-runs update in place).
 
+### Bench mode
+
+`/bench` runs a self-comparison harness: research-engine vs vanilla Claude Code (general-purpose subagent) on the same 5-topic set, scored by LLM-as-judge on 5 axes (Coverage / Citation / Depth / Structure / Reproducibility). Outputs land in `bench/runs/<date>/report.md` with an `Improvement opportunities` section.
+
+```
+/bench --check                          # preflight only
+/bench --topic smoke --no-judge         # 1–2 min plumbing smoke
+/bench                                  # full matrix (~3 hours)
+/bench --topic <id> --force             # re-run a single topic
+/bench --report-only                    # regenerate report from existing results.json
+```
+
+Spec: `docs/superpowers/specs/2026-04-26-research-engine-bench-design.md`.
+
 ## Notion mirroring (optional one-time setup)
 
 When `NOTION_TOKEN` + `NOTION_PARENT_PAGE_ID` are set, every `/research` run upserts a row in a `research-engine` database under the parent page. Each session is a single consolidated page whose body holds the main report plus collapsible toggles for transcript, followups, and related materials. Re-running the same session (e.g. via `/research-followup`) updates the row in place instead of duplicating.

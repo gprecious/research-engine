@@ -20,6 +20,16 @@ New bats files added in 0.3.0:
 
 See `tests/acceptance/*.md` — each file is a checklist you step through in a fresh Claude Code session with the plugin installed.
 
+### Bench tests
+
+- `tests/bats/test_collect_metrics.bats`
+- `tests/bats/test_judge.bats`
+- `tests/bats/test_report.bats`
+- `tests/bats/test_bench_run.bats`
+
+Run all bench tests: `bats tests/bats/test_*.bats`
+Manual acceptance: `tests/acceptance/bench.md` (created in Task 15)
+
 ## Adapter contract
 
 All adapters return the JSON specified in `lib/adapter_contract.md`. The orchestrator (`commands/research.md`) merges these into the report.
