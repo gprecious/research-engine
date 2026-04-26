@@ -1,0 +1,19 @@
+# Mini-bench topic set. See docs/superpowers/specs/2026-04-26-research-engine-bench-design.md
+#
+# Fairness rule (production topics, added in Task 16): every `baseline_prompt`
+# shares ONLY the keywords "deep research" + "구조화된 markdown" + "인용 포함"
+# (or near-equivalents). Any extra guidance leaks research-engine prompt
+# design into the baseline.
+#
+# Available substitutions inside baseline_prompt:
+#   {url}    → the topic's url field (skipped if null)
+#   {topic}  → the id stripped of category prefix (e.g., topic-foo → foo)
+
+topics:
+  # Smoke topic — used by `bench/run.sh --topic smoke --no-judge` for plumbing
+  # validation. Stable, short, well-known target so smoke is reproducible.
+  - id: smoke
+    category: arxiv
+    url: https://arxiv.org/abs/1706.03762
+    baseline_prompt: |
+      이 논문에 대한 deep research 리포트를 만들어줘: {url}
