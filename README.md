@@ -61,7 +61,9 @@ Output lands in `research/YYYY-MM-DD-<slug>/README.md`. When Notion is configure
 
 ### Bench mode
 
-`/bench` runs a self-comparison harness: research-engine vs vanilla Claude Code (general-purpose subagent) on the same 5-topic set, scored by LLM-as-judge on 5 axes (Coverage / Citation / Depth / Structure / Reproducibility). Outputs land in `bench/runs/<date>/report.md` with an `Improvement opportunities` section.
+`/bench` runs a self-comparison harness: research-engine vs vanilla Claude Code (general-purpose subagent) on the same topic set, scored by LLM-as-judge on 5 axes (Coverage / Citation / Depth / Structure / Reproducibility). Outputs land in `bench/runs/<date>/report.md` with an `Improvement opportunities` section.
+
+The matrix runs **inside the user's Claude Code session** (not as `claude -p` subprocesses) because plugin slash commands do not resolve in non-interactive `claude -p` mode. RE mode invokes `Skill('research-engine:research', ...)`; baseline mode dispatches a general-purpose subagent with the topic's `baseline_prompt`. See `commands/bench.md` for the full pipeline.
 
 ```
 /bench --check                          # preflight only

@@ -6,7 +6,7 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 ## [Unreleased]
 
 ### Added
-- `/bench` slash command — repeatable mini-bench comparing research-engine vs Claude Code baseline on a 5-topic × 2-mode × N=2 matrix, with LLM-as-judge 5-axis rubric and improvement-opportunities report.
+- `/bench` slash command — repeatable mini-bench comparing research-engine vs Claude Code baseline on a topic × 2-mode × 2-trial matrix, with LLM-as-judge 5-axis rubric and improvement-opportunities report. Runs inside the user's session (RE mode invokes `Skill('research-engine:research')`; baseline dispatches a general-purpose subagent) because `claude -p` does not resolve plugin slash commands non-interactively.
 
 ## 0.8.2 — 2026-04-20
 
