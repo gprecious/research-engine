@@ -19,6 +19,6 @@ provides accessible context.
 [2] https://blog.example.com/mamba-explainer
 [3] https://github.com/state-spaces/mamba
 
-External links count target: 5 (3 numbered citations + 2 inline links).
+External links count target: 4 (5 raw URLs, 1 deduplicated by sort -u — github.com/state-spaces/mamba appears twice).
 Citation count target: 5 ([1], [2], [3] appear 5 times collectively across body).
 Word count target: ~70.

@@ -30,18 +30,14 @@ DEFAULT_MODEL = "claude-sonnet-4-6"
 
 
 def build_cross_mode_prompt(text_a: str, text_b: str, topic_id: str) -> str:
-    system = PROMPT_FILE.read_text(encoding="utf-8")
     return (
-        f"{system}\n\n"
         f"## Topic id (for your reference only)\n{topic_id}\n\n"
         f"## report A\n\n{text_a}\n\n## report B\n\n{text_b}\n"
     )
 
 
 def build_repro_prompt(run1: str, run2: str, topic_id: str) -> str:
-    system = PROMPT_FILE.read_text(encoding="utf-8")
     return (
-        f"{system}\n\n"
         f"## Reproducibility judgment\n"
         f"Topic: {topic_id}\n\n"
         f"## report run1\n\n{run1}\n\n## report run2\n\n{run2}\n"
@@ -50,8 +46,9 @@ def build_repro_prompt(run1: str, run2: str, topic_id: str) -> str:
 
 def call_claude(prompt: str, model: str) -> str:
     """Invoke claude -p with the prompt; return stdout. Stdlib subprocess only."""
+    system = PROMPT_FILE.read_text(encoding="utf-8")
     proc = subprocess.run(
-        ["claude", "-p", "--model", model, prompt],
+        ["claude", "-p", "--model", model, "--system-prompt", system, prompt],
         capture_output=True, text=True, timeout=600,
     )
     if proc.returncode != 0:

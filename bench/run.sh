@@ -142,7 +142,9 @@ run_one() {
 }
 
 main() {
-  preflight
+  if (( ! REPORT_ONLY )); then
+    preflight
+  fi
   mkdir -p "$RUNS_DIR"
 
   local topic_ids
@@ -166,17 +168,23 @@ main() {
   if (( ! NO_JUDGE && ! REPORT_ONLY )); then
     for topic_id in $topic_ids; do
       local td="$RUNS_DIR/$topic_id"
-      if [[ -d "$td/re" && -d "$td/baseline" ]]; then
-        python3 "$ROOT/judge.py" --topic-dir "$td" --topic-id "$topic_id" --judge-model "$JUDGE_MODEL" \
-          || echo "  [judge $topic_id] FAILED — continuing"
+      if [[ ! -d "$td/re" || ! -d "$td/baseline" ]]; then continue; fi
+      if [[ -f "$td/judge.json" && "$FORCE" -ne 1 ]]; then
+        echo "  [judge $topic_id] skip exists"
+        continue
       fi
+      python3 "$ROOT/judge.py" --topic-dir "$td" --topic-id "$topic_id" --judge-model "$JUDGE_MODEL" \
+        || echo "  [judge $topic_id] FAILED — continuing"
     done
   fi
 
   local results="$RUNS_DIR/results.json"
-  python3 - <<PY > "$results"
+  local categories_json
+  categories_json=$(yq -o=json '.topics | map({(.id): .category}) | add' "$TOPICS")
+  TOPIC_CATEGORIES="$categories_json" python3 - <<PY > "$results"
 import json, os
 from pathlib import Path
+categories = json.loads(os.environ.get("TOPIC_CATEGORIES", "{}"))
 runs_dir = Path("$RUNS_DIR")
 topics = []
 for td in sorted(p for p in runs_dir.iterdir() if p.is_dir()):
@@ -196,7 +204,7 @@ for td in sorted(p for p in runs_dir.iterdir() if p.is_dir()):
     re_b, base_b = block("re"), block("baseline")
     delta = (re_b["weighted_total"] or 0) - (base_b["weighted_total"] or 0) if (re_b["weighted_total"] and base_b["weighted_total"]) else None
     topics.append({
-        "id": td.name, "category": "?",
+        "id": td.name, "category": categories.get(td.name, "?"),
         "re": re_b, "baseline": base_b, "delta": delta,
         "judge_rationale": (cm.get("re", {}).get("rationale", "") + " | " + cm.get("baseline", {}).get("rationale", "")).strip(" |"),
     })
