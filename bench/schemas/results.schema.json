@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Aggregated bench results",
+  "type": "object",
+  "required": ["bench_date", "judge_model", "topics", "aggregate"],
+  "properties": {
+    "bench_date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "judge_model": { "type": "string" },
+    "model_under_test": { "type": "string" },
+    "topics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "category", "re", "baseline"],
+        "properties": {
+          "id":       { "type": "string" },
+          "category": { "enum": ["youtube", "arxiv", "github", "blog", "topic"] },
+          "re":       { "$ref": "#/definitions/mode_block" },
+          "baseline": { "$ref": "#/definitions/mode_block" },
+          "delta":    { "type": ["number", "null"] },
+          "judge_rationale": { "type": "string" }
+        }
+      }
+    },
+    "aggregate": {
+      "type": "object",
+      "properties": {
+        "re_avg":       { "type": ["number", "null"] },
+        "baseline_avg": { "type": ["number", "null"] },
+        "delta_avg":    { "type": ["number", "null"] },
+        "by_axis":      { "type": "object" },
+        "by_category":  { "type": "object" }
+      }
+    }
+  },
+  "definitions": {
+    "mode_block": {
+      "type": "object",
+      "properties": {
+        "run1": { "type": "object" },
+        "run2": { "type": "object" },
+        "scores": { "type": "object" },
+        "weighted_total": { "type": ["number", "null"] }
+      }
+    }
+  }
+}

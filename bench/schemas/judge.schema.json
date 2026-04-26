@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Per-topic judge output",
+  "type": "object",
+  "required": ["topic_id", "judge_model", "cross_mode", "reproducibility"],
+  "properties": {
+    "topic_id": { "type": "string" },
+    "judge_model": { "type": "string" },
+    "judged_at": { "type": "string", "format": "date-time" },
+    "blind_label_map": {
+      "type": "object",
+      "properties": {
+        "A": { "enum": ["re", "baseline"] },
+        "B": { "enum": ["re", "baseline"] }
+      },
+      "required": ["A", "B"]
+    },
+    "judge_blind": { "type": "boolean" },
+    "cross_mode": {
+      "type": "object",
+      "properties": {
+        "re":       { "$ref": "#/definitions/axis_scores" },
+        "baseline": { "$ref": "#/definitions/axis_scores" }
+      },
+      "required": ["re", "baseline"]
+    },
+    "reproducibility": {
+      "type": "object",
+      "properties": {
+        "re":       { "type": ["number", "null"], "minimum": 0, "maximum": 10 },
+        "baseline": { "type": ["number", "null"], "minimum": 0, "maximum": 10 }
+      },
+      "required": ["re", "baseline"]
+    }
+  },
+  "definitions": {
+    "axis_scores": {
+      "type": "object",
+      "properties": {
+        "coverage":  { "type": ["number", "null"], "minimum": 0, "maximum": 10 },
+        "citation":  { "type": ["number", "null"], "minimum": 0, "maximum": 10 },
+        "depth":     { "type": ["number", "null"], "minimum": 0, "maximum": 10 },
+        "structure": { "type": ["number", "null"], "minimum": 0, "maximum": 10 },
+        "rationale": { "type": "string" }
+      },
+      "required": ["coverage", "citation", "depth", "structure"]
+    }
+  }
+}
