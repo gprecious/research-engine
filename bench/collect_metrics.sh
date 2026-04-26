@@ -29,7 +29,7 @@ if [[ ! -s "$OUTPUT" ]]; then
   exit 0
 fi
 
-WORDS=$(wc -w < "$OUTPUT" | tr -d ' ')
+WORDS=$(wc -w < "$OUTPUT" | awk '{print $1}')
 
 # Numbered citations [1], [2], etc — count occurrences (not unique).
 CITATIONS=$(grep -oE '\[[0-9]+\]' "$OUTPUT" | wc -l | tr -d ' ')

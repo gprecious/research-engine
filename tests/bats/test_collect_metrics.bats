@@ -28,13 +28,13 @@ teardown() { rm -rf "$TMPDIR_T"; }
 @test "counts numbered citations in output.md" {
   "$SCRIPT" "$TMPDIR_T" 1700000000 1700000612
   cc=$(jq -r '.citation_count' "$TMPDIR_T/meta.json")
-  [ "$cc" -ge 3 ]
+  [ "$cc" -eq 10 ]
 }
 
 @test "counts external links in output.md" {
   "$SCRIPT" "$TMPDIR_T" 1700000000 1700000612
   ec=$(jq -r '.external_link_count' "$TMPDIR_T/meta.json")
-  [ "$ec" -ge 3 ]
+  [ "$ec" -eq 4 ]
 }
 
 @test "marks status failed when output.md is missing" {
