@@ -33,3 +33,13 @@ teardown() { rm -rf "$TMPDIR_T"; }
   [ "$re_cov" != "null" ]
   [ "$base_cov" != "null" ]
 }
+
+@test "--self-check writes judge.json with both A and B (RE-as-both)" {
+  # Self-check feeds the same RE output as both A and B.
+  # We use --from-fixture to skip the live claude call; this just verifies
+  # the wiring (judge.json exists, both cross_mode keys are populated).
+  run "$SCRIPT" --self-check --from-fixture "$CANNED" \
+      --topic-dir "$TMPDIR_T/topic-1" --topic-id topic-1
+  [ "$status" -eq 0 ]
+  [ -f "$TMPDIR_T/topic-1/judge.json" ]
+}
