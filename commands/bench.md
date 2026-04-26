@@ -116,11 +116,47 @@ Filter by `--topic` if set. For each `topic_id`:
 
 Skip if `--no-judge` or `--report-only` was passed.
 
-```
-bash "${CLAUDE_PLUGIN_ROOT}/bench/run.sh" --judge ${ONLY_TOPIC:+--topic "$ONLY_TOPIC"} ${FORCE:+--force} --judge-model "${JUDGE_MODEL}"
-```
+The judge ALSO runs in this session via Agent dispatch — `judge.py`'s built-in `call_claude()` uses external `claude -p` which does not resolve plugins/auth the same way and hits rate limits independently. Orchestrate judging directly:
 
-This iterates populated topic dirs and invokes `judge.py` for each. Already-judged topics are skipped unless `--force`.
+For each topic_id (filter by `--topic`):
+  Compute `td = ${RUNS_DIR}/${topic_id}`.
+  Skip if not (re/run1/output.md AND baseline/run1/output.md exist).
+  Skip if `td/judge.json` already exists and `--force` is NOT set.
+
+  **Stage 4a — cross-mode comparison**:
+    1. Random A/B label assignment (e.g., `[[ $((RANDOM % 2)) -eq 0 ]]` to decide whether RE is A or B).
+    2. Read system prompt: `${CLAUDE_PLUGIN_ROOT}/bench/lib/judge_prompt.md`.
+    3. Build user content: `## Topic id: ${topic_id}\n\n## report A\n\n<text_a>\n\n## report B\n\n<text_b>` where the texts are the contents of the two `output.md` files (re/run1 and baseline/run1) ordered by the A/B assignment.
+    4. Dispatch `Agent(subagent_type='general-purpose', model='haiku', description='judge cross-mode', prompt=<system_prompt> + '\n\n---\n\n' + <user_content> + '\n\nReturn ONLY the JSON object as specified — no preamble, no fences.')` and capture the response.
+    5. Parse the response as JSON. If parsing fails, retry once with stricter wording. If still fails, write a placeholder judge.json with `judge_blind: false` and continue.
+    6. Decode A/B back to re/baseline based on the random assignment in step 1.
+
+  **Stage 4b — reproducibility (if run2 exists for both modes)**:
+    For each mode in [re, baseline]:
+      If `${td}/${mode}/run1/output.md` AND `${td}/${mode}/run2/output.md` both exist:
+        Read both files.
+        Build prompt: system + `## Reproducibility judgment\nTopic: ${topic_id}\n\n## report run1\n\n<text1>\n\n## report run2\n\n<text2>`.
+        Dispatch Agent and capture response.
+        Parse `reproducibility` score (0-10) from JSON.
+      Else: reproducibility[mode] = null.
+
+  Write `${td}/judge.json` matching the schema in `bench/schemas/judge.schema.json`:
+  ```json
+  {
+    "topic_id": "...",
+    "judge_model": "claude-haiku-4-5 (via Agent)",
+    "judged_at": "<ISO 8601 UTC>",
+    "blind_label_map": {"A": "re|baseline", "B": "re|baseline"},
+    "judge_blind": <true unless response contained label-leak keywords like research-engine/plugin/subagent>,
+    "cross_mode": {
+      "re":       {"coverage":N, "citation":N, "depth":N, "structure":N, "rationale":"..."},
+      "baseline": {"coverage":N, "citation":N, "depth":N, "structure":N, "rationale":"..."}
+    },
+    "reproducibility": {"re": <N|null>, "baseline": <N|null>}
+  }
+  ```
+
+Print: `[judge ${topic_id}] OK` or `[judge ${topic_id}] FAILED` per topic.
 
 ### Stage 5 — Aggregate + report
 

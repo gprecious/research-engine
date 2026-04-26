@@ -98,7 +98,7 @@ aggregate_and_report() {
 
   local results="$RUNS_DIR/results.json"
   local categories_json
-  categories_json=$(yq -o=json '.topics | map({(.id): .category}) | add' "$TOPICS")
+  categories_json=$(yq -o=json '.topics' "$TOPICS" | jq 'map({(.id): .category}) | add')
 
   TOPIC_CATEGORIES="$categories_json" python3 - <<PY > "$results"
 import json, os

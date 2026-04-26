@@ -39,8 +39,12 @@ def render(results: dict) -> str:
     by_axis = agg.get("by_axis", {})
     if by_axis:
         lines.append("\n```mermaid\nxychart-beta\n  title \"Per-axis averages (0–10)\"\n  x-axis [coverage, citation, depth, structure, reproducibility]\n")
-        re_vals = [by_axis.get(a, {}).get("re", 0) for a in ("coverage","citation","depth","structure","reproducibility")]
-        base_vals = [by_axis.get(a, {}).get("baseline", 0) for a in ("coverage","citation","depth","structure","reproducibility")]
+        # Coerce None → 0 so mermaid renders without "None" literals.
+        def axis_val(mode, axis):
+            v = by_axis.get(axis, {}).get(mode)
+            return v if v is not None else 0
+        re_vals = [axis_val("re", a) for a in ("coverage","citation","depth","structure","reproducibility")]
+        base_vals = [axis_val("baseline", a) for a in ("coverage","citation","depth","structure","reproducibility")]
         lines.append(f"  y-axis 0 --> 10\n  bar {re_vals}\n  bar {base_vals}\n```\n")
 
     lines.append("\n## Per-topic detail\n")
