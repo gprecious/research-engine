@@ -85,7 +85,27 @@ Structure subsections by topic, not by adapter. Merge findings that reinforce th
 - [{{title}}]({{url}}) — {{one_line_why_relevant}}
 ```
 
-## §7. 수집 실패 (Failures) — include only if non-empty
+## §7. 한계 / 미해결 (Limitations) — required, ≥2 bullets
+
+```markdown
+## 한계 / 미해결
+
+- {{limitation_1}}: {{one_sentence_why_or_open_question}}
+- {{limitation_2}}: ...
+```
+
+What belongs here:
+- Known weaknesses of the work analyzed (methodological gaps, dataset coverage, generalization concerns) when the input is a paper/post.
+- Open questions the source raises but does not answer.
+- Items the engine could not verify (e.g., closed-source benchmarks, claims unsupported by primary sources).
+
+What does NOT belong:
+- Adapter fetch failures — those go in §8 (수집 실패).
+- Generic disclaimers ("this is a summary, not the original paper").
+
+If the engine truly cannot identify any limitation after reviewing the body, write a single bullet `- (검토 결과 명시적 한계 없음 — 후속 검증 권장)` rather than omitting the section.
+
+## §8. 수집 실패 (Failures) — include only if non-empty
 
 ```markdown
 ## 수집 실패 (Failures)
@@ -93,7 +113,7 @@ Structure subsections by topic, not by adapter. Merge findings that reinforce th
 - `{{adapter}}` / `{{step}}` — {{error_summary}}
 ```
 
-## §8. Sources
+## §9. Sources
 
 ```markdown
 ## Sources
