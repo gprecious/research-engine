@@ -2,6 +2,18 @@
 
 Used by `commands/research.md` during Stage 5 (Synthesize). Include only the sections whose inputs exist; omit empty sections instead of printing "N/A".
 
+## Citation enforcement (applies to §3, §4, §5)
+
+Every factual claim sentence in the body MUST end with at least one `[n]` marker tying the claim to a source. "Factual claim" means: any sentence that asserts a number, mechanism, named entity, dated event, comparison, or causal relationship. "Decorative" mass-marker citations at the end of long paragraphs are not acceptable — bind the marker to the specific claim sentence.
+
+Rules:
+- Connecting / framing sentences (e.g., "이 절에서는…", "다음으로 살펴볼 것은…") may omit `[n]`.
+- Direct quotes always carry the source `[n]`, plus `(timecode)` for YouTube.
+- If a single sentence draws on multiple sources, append all relevant ids: `... 이라고 보고됨 [3] [7]`.
+- If the synthesizer cannot find a source for a claim, the claim must be removed — never leave an unsourced factual statement in the report.
+
+This rule is absolute for §3 (핵심 포인트), §4 (상세 분석), §5 (인용 / 원문). It is recommended but not required for §1 (분석 목적), §2 (요약), and §7 (한계 / 미해결).
+
 ## Frontmatter (required)
 
 ```markdown
@@ -61,6 +73,38 @@ If `intent_mode == "assumed"`, replace "사용자 답변" heading with "추정(a
 
 Structure subsections by topic, not by adapter. Merge findings that reinforce the same claim into one bullet with multiple `[src]` markers.
 
+### Input-type-aware sub-structure (REQUIRED for academic inputs)
+
+For `input_type: arxiv` or `huggingface`, §4 MUST use these sub-headings (omit a sub-heading only if the adapter returned zero findings for that bucket):
+
+```markdown
+## 상세 분석
+
+### 방법론 / 핵심 메커니즘
+
+- {{method_finding_1, with equation or named mechanism}} [{{src}}]
+- {{method_finding_2}} [{{src}}]
+- ...
+
+### 실험 결과 / 벤치마크
+
+- {{result_finding_1, with concrete number from paper body}} [{{src}}]
+- {{result_finding_2, e.g., ablation showing X drops Y to Z}} [{{src}}]
+- {{result_finding_3, e.g., zero-shot or downstream task numbers}} [{{src}}]
+- ...
+
+### 저자 한계 / 미해결
+
+- {{limitation_finding_1, marked by adapter as 저자가 명시한 한계}} [{{src}}]
+- ...
+```
+
+Minimum 2 fine-grained findings per sub-heading when content is available. Do NOT collapse method details, ablation rows, or evaluation-table entries into single summary lines — granularity IS the depth signal.
+
+For `github` / `context7` (code/docs), prefer sub-headings like `### 구조 / 모듈`, `### 활성도 / 메인테이닝`, `### 사용 패턴` when each has 2+ findings.
+
+For `youtube` / `blog` / `community`, free-form sub-headings by topic remain appropriate.
+
 ## §5. 인용 / 원문
 
 ```markdown
@@ -85,7 +129,27 @@ Structure subsections by topic, not by adapter. Merge findings that reinforce th
 - [{{title}}]({{url}}) — {{one_line_why_relevant}}
 ```
 
-## §7. 수집 실패 (Failures) — include only if non-empty
+## §7. 한계 / 미해결 (Limitations) — required, ≥2 bullets
+
+```markdown
+## 한계 / 미해결
+
+- {{limitation_1}}: {{one_sentence_why_or_open_question}}
+- {{limitation_2}}: ...
+```
+
+What belongs here:
+- Known weaknesses of the work analyzed (methodological gaps, dataset coverage, generalization concerns) when the input is a paper/post.
+- Open questions the source raises but does not answer.
+- Items the engine could not verify (e.g., closed-source benchmarks, claims unsupported by primary sources).
+
+What does NOT belong:
+- Adapter fetch failures — those go in §8 (수집 실패).
+- Generic disclaimers ("this is a summary, not the original paper").
+
+If the engine truly cannot identify any limitation after reviewing the body, write a single bullet `- (검토 결과 명시적 한계 없음 — 후속 검증 권장)` rather than omitting the section.
+
+## §8. 수집 실패 (Failures) — include only if non-empty
 
 ```markdown
 ## 수집 실패 (Failures)
@@ -93,7 +157,7 @@ Structure subsections by topic, not by adapter. Merge findings that reinforce th
 - `{{adapter}}` / `{{step}}` — {{error_summary}}
 ```
 
-## §8. Sources
+## §9. Sources
 
 ```markdown
 ## Sources

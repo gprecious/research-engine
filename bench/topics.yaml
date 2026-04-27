@@ -1,0 +1,55 @@
+# Mini-bench topic set. See docs/superpowers/specs/2026-04-26-research-engine-bench-design.md
+#
+# Fairness rule (production topics, added in Task 16): every `baseline_prompt`
+# shares ONLY the keywords "deep research" + "구조화된 markdown" + "인용 포함"
+# (or near-equivalents). Any extra guidance leaks research-engine prompt
+# design into the baseline.
+#
+# Available substitutions inside baseline_prompt:
+#   {url}    → the topic's url field (skipped if null)
+#   {topic}  → the id stripped of category prefix (e.g., topic-foo → foo)
+
+topics:
+  # Smoke topic — used by `bench/run.sh --topic smoke --no-judge` for plumbing
+  # validation. Stable, short, well-known target so smoke is reproducible.
+  - id: smoke
+    category: arxiv
+    url: https://arxiv.org/abs/1706.03762
+    baseline_prompt: |
+      이 논문에 대한 deep research 리포트를 만들어줘: {url}
+
+  # Production topics — picked 2026-04-27 for diverse adapter coverage.
+  - id: youtube-3blue1brown-gpt
+    category: youtube
+    url: https://www.youtube.com/watch?v=wjZofJX0v4M
+    baseline_prompt: |
+      이 YouTube 영상에 대한 deep research 를 해줘. 핵심 주장, 인용, 한계점 포함한
+      구조화된 markdown 리포트를 만들어줘: {url}
+
+  - id: arxiv-mamba
+    category: arxiv
+    url: https://arxiv.org/abs/2312.00752
+    baseline_prompt: |
+      이 논문에 대한 deep research 리포트를 만들어줘. 핵심 기여, 방법론, 인용 포함된
+      구조화된 markdown 으로: {url}
+
+  - id: github-anthropic-courses
+    category: github
+    url: https://github.com/anthropics/courses
+    baseline_prompt: |
+      이 GitHub 저장소를 분석해줘 — 목적, 구조, 활성도, 사용 사례. 인용 포함된
+      구조화된 markdown 리포트로: {url}
+
+  - id: blog-anthropic-harness
+    category: blog
+    url: https://www.anthropic.com/engineering/harness-design-long-running-apps
+    baseline_prompt: |
+      이 블로그/문서 페이지에 대한 deep research. 핵심 주장, 인용, 한계점 포함한
+      구조화된 markdown: {url}
+
+  - id: topic-moe-routing-2025
+    category: topic
+    url: null
+    baseline_prompt: |
+      "{topic}" 에 대한 deep research 리포트를 만들어줘. 최신 동향, 주요 플레이어,
+      인용 포함된 구조화된 markdown.

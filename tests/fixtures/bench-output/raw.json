@@ -1,0 +1,11 @@
+{
+  "result": "# Sample research output\n\n## TL;DR\n\nMamba is a state-space model...\n",
+  "usage": {
+    "input_tokens": 12340,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 2100
+  },
+  "stop_reason": "end_turn",
+  "model": "claude-opus-4-7"
+}

@@ -1,0 +1,51 @@
+{
+  "bench_date": "2026-04-26",
+  "judge_model": "claude-sonnet-4-6",
+  "model_under_test": "claude-opus-4-7",
+  "topics": [
+    {
+      "id": "youtube-sample",
+      "category": "youtube",
+      "re": {
+        "scores": {"coverage": 8.5, "citation": 9.0, "depth": 8.0, "structure": 9.0, "reproducibility": 8.5},
+        "weighted_total": 86.0
+      },
+      "baseline": {
+        "scores": {"coverage": 6.0, "citation": 5.5, "depth": 5.0, "structure": 7.0, "reproducibility": 6.0},
+        "weighted_total": 59.0
+      },
+      "delta": 27.0,
+      "judge_rationale": "RE coverage broader, citations specific."
+    },
+    {
+      "id": "arxiv-sample",
+      "category": "arxiv",
+      "re": {
+        "scores": {"coverage": 7.0, "citation": 6.5, "depth": 7.5, "structure": 8.0, "reproducibility": 9.0},
+        "weighted_total": 76.0
+      },
+      "baseline": {
+        "scores": {"coverage": 7.5, "citation": 7.0, "depth": 6.5, "structure": 7.5, "reproducibility": 8.0},
+        "weighted_total": 72.0
+      },
+      "delta": 4.0,
+      "judge_rationale": "Close call; baseline slightly stronger on coverage."
+    }
+  ],
+  "aggregate": {
+    "re_avg": 81.0,
+    "baseline_avg": 65.5,
+    "delta_avg": 15.5,
+    "by_axis": {
+      "coverage":       {"re": 7.75, "baseline": 6.75},
+      "citation":       {"re": 7.75, "baseline": 6.25},
+      "depth":          {"re": 7.75, "baseline": 5.75},
+      "structure":      {"re": 8.50, "baseline": 7.25},
+      "reproducibility":{"re": 8.75, "baseline": 7.00}
+    },
+    "by_category": {
+      "youtube": {"re": 86.0, "baseline": 59.0, "delta": 27.0},
+      "arxiv":   {"re": 76.0, "baseline": 72.0, "delta": 4.0}
+    }
+  }
+}

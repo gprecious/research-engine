@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Per-run metadata",
+  "type": "object",
+  "required": ["status"],
+  "properties": {
+    "status": { "enum": ["ok", "failed", "timeout", "skipped"] },
+    "wall_time_sec": { "type": "integer", "minimum": 0 },
+    "word_count": { "type": "integer", "minimum": 0 },
+    "citation_count": { "type": "integer", "minimum": 0 },
+    "external_link_count": { "type": "integer", "minimum": 0 },
+    "model_tokens": {
+      "type": ["object", "null"],
+      "properties": {
+        "input": { "type": "integer", "minimum": 0 },
+        "output": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "exit_code": { "type": "integer" }
+  },
+  "additionalProperties": false
+}

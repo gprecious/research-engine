@@ -102,6 +102,11 @@ Timeout per adapter: 5 minutes (configured implicitly by the agent runtime; do N
    }
    ```
 3. Write `<report_dir>/README.md` using the templates in `lib/report_sections.md`. Merge findings by topic, not by adapter. Dedupe near-duplicate findings. Preserve `[n]` markers.
+
+   **Dedupe is input-type-aware:**
+   - For `arxiv` / `huggingface` (academic) inputs: `상세 분석` (§4) MUST be sub-divided into `### 방법론 / 핵심 메커니즘`, `### 실험 결과 / 벤치마크`, `### 저자 한계 / 미해결` — at least 2 fine-grained findings per sub-heading. Do NOT collapse method details, ablations, zero-shot evaluations, or related-work taxonomy into single bullets even when they share a parent topic. The granularity IS the depth signal for academic content.
+   - For `youtube` / `blog` / `community`: standard merge-by-topic dedup.
+   - For `github` / `context7` (code/docs): keep separate sub-headings for code structure, activity signals, and usage patterns when each has 2+ findings.
 4. YouTube only: write `<report_dir>/transcript.md` from the youtube-adapter `artifacts.transcript_md`.
 5. For each unique `related[]` entry, write `<report_dir>/related/<kind>-<slug>.md` with a one-paragraph summary + URL. Deduplicate by URL.
 6. If any adapter had non-empty `failures[]`, include the `## 수집 실패 (Failures)` section in README.md.

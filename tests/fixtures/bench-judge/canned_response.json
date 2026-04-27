@@ -1,0 +1,16 @@
+{
+  "A": {
+    "coverage": 8.5,
+    "citation": 9.0,
+    "depth":    7.5,
+    "structure": 9.0,
+    "rationale": "Coverage broad; citations specific; depth solid; structure clean."
+  },
+  "B": {
+    "coverage": 6.0,
+    "citation": 5.5,
+    "depth":    5.0,
+    "structure": 7.0,
+    "rationale": "Coverage partial; citations decorative; depth shallow; structure ok."
+  }
+}
