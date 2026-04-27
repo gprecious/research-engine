@@ -138,6 +138,36 @@ notion_upload_file() {
   echo "$upload_id"
 }
 
+# ----- jq helpers that avoid MAX_ARG_STRLEN (131KB argv) on large JSON -----
+#
+# Linux caps a single argv entry at MAX_ARG_STRLEN (131072 bytes). Passing a
+# multi-hundred-KB JSON blob via `jq --argjson NAME "$VAR"` therefore fails
+# with "Argument list too long" once README + transcript + 20+ related files
+# accumulate. Routing the blob through a process-substitution FD (from a
+# `printf` *builtin*, which does not execve) keeps the blob in memory/pipes
+# and jq sees only the `/dev/fd/N` path on argv.
+
+jq_concat_arrays() {
+  # Prints $1 + $2 where both are JSON array strings.
+  jq -s '.[0] + .[1]' <(printf '%s' "$1") <(printf '%s' "$2")
+}
+
+jq_append_element() {
+  # Prints $1 + [$2] where $1 is JSON array string, $2 is JSON value string.
+  jq -s '.[0] + [.[1]]' <(printf '%s' "$1") <(printf '%s' "$2")
+}
+
+# ----- Select enum whitelists (match ensure_database schema below) -----
+PURPOSE_ENUM="학습 의사결정 공유 기타"
+AUDIENCE_ENUM="입문 중급 전문가"
+INPUT_TYPE_ENUM="youtube arxiv github blog topic huggingface community"
+
+_enum_match() {
+  # $1=value, $2=space-delimited whitelist. Returns 0 if value is in whitelist.
+  local val="$1" list="$2"
+  [[ " $list " == *" $val "* ]]
+}
+
 # ----- Markdown → Notion blocks (python helper, shared) -----
 # Python source is stored in a variable so `python3 -c` can execute it while
 # keeping stdin free for the markdown input. An inline `python3 - <<PYEOF`
@@ -163,14 +193,134 @@ try:
 except Exception:
     UPLOAD_MAP = {}
 
-def rtext(s):
+# ---------- inline rich-text parser ----------
+# Handles **bold**, *italic*, `code`, [text](url) within paragraph/heading/list/cell content.
+# Chunks to 1900 chars to stay under Notion's 2000-char rich_text limit.
+_INLINE_RE = re.compile(
+    r"(\*\*[^*\n]+?\*\*)"      # bold
+    r"|(`[^`\n]+?`)"            # inline code
+    r"|(\[[^\]\n]+?\]\([^)\n]+?\))"  # link
+    r"|(\*[^*\n]+?\*)"          # italic
+)
+
+def _rt_chunked(content, bold=False, italic=False, code=False, href=None):
     out = []
+    s = content
     while s:
         chunk, s = s[:1900], s[1900:]
-        out.append({"type": "text", "text": {"content": chunk}})
+        text_obj = {"content": chunk}
+        if href:
+            text_obj["link"] = {"url": href}
+        rt = {"type": "text", "text": text_obj}
+        ann = {}
+        if bold:   ann["bold"]   = True
+        if italic: ann["italic"] = True
+        if code:   ann["code"]   = True
+        if ann:
+            rt["annotations"] = ann
+        out.append(rt)
+    return out
+
+def rtext(s):
+    """Parse an inline markdown string into a Notion rich_text array."""
+    out = []
+    last = 0
+    for m in _INLINE_RE.finditer(s):
+        if m.start() > last:
+            out.extend(_rt_chunked(s[last:m.start()]))
+        tok = m.group(0)
+        if tok.startswith("**") and tok.endswith("**"):
+            out.extend(_rt_chunked(tok[2:-2], bold=True))
+        elif tok.startswith("`") and tok.endswith("`"):
+            out.extend(_rt_chunked(tok[1:-1], code=True))
+        elif tok.startswith("["):
+            lm = re.match(r"\[([^\]]+)\]\(([^)]+)\)", tok)
+            if lm:
+                out.extend(_rt_chunked(lm.group(1), href=lm.group(2)))
+            else:
+                out.extend(_rt_chunked(tok))
+        elif tok.startswith("*") and tok.endswith("*"):
+            out.extend(_rt_chunked(tok[1:-1], italic=True))
+        else:
+            out.extend(_rt_chunked(tok))
+        last = m.end()
+    if last < len(s):
+        out.extend(_rt_chunked(s[last:]))
     if not out:
         out = [{"type": "text", "text": {"content": ""}}]
     return out
+
+# ---------- callout detection ----------
+# Blockquotes that start with a well-known emoji become Notion callouts with
+# matching icon (and light background color where helpful), dramatically
+# improving readability vs. plain gray quote bars.
+CALLOUT_MAP = {
+    "⚠️":  ("⚠️",  "yellow_background"),
+    "❗":  ("❗",  "red_background"),
+    "❌":  ("❌",  "red_background"),
+    "✅":  ("✅",  "green_background"),
+    "ℹ️":  ("ℹ️",  "blue_background"),
+    "📒":  ("📒",  "gray_background"),
+    "📝":  ("📝",  "gray_background"),
+    "📸":  ("📸",  "purple_background"),
+    "💡":  ("💡",  "yellow_background"),
+    "🔗":  ("🔗",  "blue_background"),
+    "🚨":  ("🚨",  "red_background"),
+}
+
+def match_callout(body_after_gt):
+    for emoji, (icon, color) in CALLOUT_MAP.items():
+        if body_after_gt.startswith(emoji + " "):
+            return icon, color, body_after_gt[len(emoji)+1:]
+        if body_after_gt.startswith(emoji):
+            return icon, color, body_after_gt[len(emoji):].lstrip()
+    return None
+
+# ---------- pipe-table parser ----------
+# A well-formed Markdown pipe table is:
+#     | h1 | h2 |
+#     | --- | --- |
+#     | c1 | c2 |
+# We buffer pending table state and flush when the table ends.
+
+def is_table_line(line):
+    s = line.strip()
+    return s.startswith("|") and s.endswith("|") and len(s) > 1
+
+def is_table_sep(line):
+    return bool(re.match(r"^\s*\|?[\s:|-]+\|?\s*$", line)) and "-" in line and "|" in line
+
+def split_row(line):
+    s = line.strip()
+    if s.startswith("|"): s = s[1:]
+    if s.endswith("|"):   s = s[:-1]
+    # Naive split — assume cell contents don't contain escaped |.
+    return [c.strip() for c in s.split("|")]
+
+def make_table_block(header, rows):
+    width = len(header)
+    children = []
+    def _row(cells):
+        while len(cells) < width: cells.append("")
+        cells = cells[:width]
+        return {
+            "object": "block",
+            "type": "table_row",
+            "table_row": {"cells": [rtext(c) for c in cells]}
+        }
+    children.append(_row(header))
+    for r in rows:
+        children.append(_row(r))
+    return {
+        "object": "block",
+        "type": "table",
+        "table": {
+            "table_width": width,
+            "has_column_header": True,
+            "has_row_header": False,
+            "children": children
+        }
+    }
 
 def flush_code():
     global code_buf, code_lang, in_code
@@ -218,41 +368,96 @@ def try_image_block(line):
 
 NOTION_LANGS = {"abap","arduino","bash","basic","c","clojure","coffeescript","c++","c#","css","dart","diff","docker","elixir","elm","erlang","flow","fortran","f#","gherkin","glsl","go","graphql","groovy","haskell","html","java","javascript","json","julia","kotlin","latex","less","lisp","livescript","lua","makefile","markdown","markup","matlab","mermaid","nix","objective-c","ocaml","pascal","perl","php","plain text","powershell","prolog","protobuf","python","r","reason","ruby","rust","sass","scala","scheme","scss","shell","solidity","sql","swift","typescript","vb.net","verilog","vhdl","visual basic","webassembly","xml","yaml"}
 
-for line in md.splitlines():
+# ---------- main line loop with table lookahead ----------
+lines = md.splitlines()
+i = 0
+N = len(lines)
+while i < N:
+    line = lines[i]
+
+    # Inside a fenced code block: accumulate until closing ```
     if in_code:
         if line.startswith("```"):
             flush_code()
         else:
             code_buf.append(line)
+        i += 1
         continue
+
+    # Fenced code block opener
     m = re.match(r"^```(\w*)\s*$", line)
     if m:
         in_code = True
         code_lang = (m.group(1) or "plain text")
         if code_lang not in NOTION_LANGS: code_lang = "plain text"
+        i += 1
         continue
+
+    # Standalone image line
     img = try_image_block(line)
     if img is not None:
         blocks.append(img)
+        i += 1
         continue
+
+    # Pipe table — require "| ... |" followed by separator "| --- | ... |"
+    if is_table_line(line) and i + 1 < N and is_table_sep(lines[i + 1]):
+        header = split_row(line)
+        j = i + 2
+        rows = []
+        while j < N and is_table_line(lines[j]) and not is_table_sep(lines[j]):
+            rows.append(split_row(lines[j]))
+            j += 1
+        blocks.append(make_table_block(header, rows))
+        i = j
+        continue
+
+    # Headings
     if line.startswith("### "):
         blocks.append({"object":"block","type":"heading_3","heading_3":{"rich_text":rtext(line[4:])}})
     elif line.startswith("## "):
         blocks.append({"object":"block","type":"heading_2","heading_2":{"rich_text":rtext(line[3:])}})
     elif line.startswith("# "):
         blocks.append({"object":"block","type":"heading_1","heading_1":{"rich_text":rtext(line[2:])}})
+
+    # Horizontal rule
     elif re.match(r"^(\*\*\*|---)\s*$", line):
         blocks.append({"object":"block","type":"divider","divider":{}})
+
+    # Blockquote → callout (if leading emoji) or plain quote
     elif line.startswith("> "):
-        blocks.append({"object":"block","type":"quote","quote":{"rich_text":rtext(line[2:])}})
+        body = line[2:]
+        hit = match_callout(body)
+        if hit:
+            icon, color, text = hit
+            blocks.append({
+                "object":"block","type":"callout",
+                "callout": {
+                    "rich_text": rtext(text),
+                    "icon": {"type": "emoji", "emoji": icon},
+                    "color": color
+                }
+            })
+        else:
+            blocks.append({"object":"block","type":"quote","quote":{"rich_text":rtext(body)}})
+
+    # Bulleted list
     elif re.match(r"^\s*[-*]\s", line):
         blocks.append({"object":"block","type":"bulleted_list_item","bulleted_list_item":{"rich_text":rtext(re.sub(r"^\s*[-*]\s", "", line))}})
+
+    # Numbered list
     elif re.match(r"^\s*\d+\.\s", line):
         blocks.append({"object":"block","type":"numbered_list_item","numbered_list_item":{"rich_text":rtext(re.sub(r"^\s*\d+\.\s", "", line))}})
+
+    # Blank line
     elif line.strip() == "":
-        continue
+        pass
+
+    # Default paragraph
     else:
         blocks.append({"object":"block","type":"paragraph","paragraph":{"rich_text":rtext(line)}})
+
+    i += 1
 
 if in_code: flush_code()
 print(json.dumps(blocks))
@@ -321,11 +526,12 @@ toggle_from_file() {
   [[ -f "$file" ]] || { echo '[]'; return 0; }
   local children
   children="$(md_to_blocks < "$file" | jq '.[0:95]')"
-  jq -n --arg t "$title" --argjson c "$children" '{
+  # --slurpfile via process substitution — avoids argv size limit on $children.
+  jq --slurpfile c <(printf '%s' "$children") --arg t "$title" -n '{
     object:"block", type:"toggle",
     toggle: {
       rich_text: [{ type:"text", text:{ content:$t } }],
-      children: $c
+      children: $c[0]
     }
   }'
 }
@@ -339,6 +545,7 @@ toggle_from_related_dir() {
   for f in "$dir"/*.md; do
     [[ -f "$f" ]] || continue
     name="$(basename "$f" .md)"
+    # Each single-file block array is small (<10KB), so --argjson is safe here.
     file_blocks="$(
       jq -n --arg name "$name" --argjson body "$(md_to_blocks < "$f")" '
         [ { object:"block", type:"heading_3", heading_3:{ rich_text:[{ type:"text", text:{ content:$name } }] } } ]
@@ -346,28 +553,33 @@ toggle_from_related_dir() {
         + [ { object:"block", type:"divider", divider:{} } ]
       '
     )"
-    combined="$(jq --argjson a "$combined" --argjson b "$file_blocks" -n '$a + $b')"
+    # The accumulator `combined` grows across iterations and can exceed 131KB
+    # with 20+ related files — route through FDs instead of argv.
+    combined="$(jq_concat_arrays "$combined" "$file_blocks")"
   done
   # Cap inline nested to 95 blocks (Notion rejects more as direct children in one call)
   combined="$(jq '.[0:95]' <<< "$combined")"
   [[ "$(jq 'length' <<< "$combined")" -eq 0 ]] && { echo 'null'; return 0; }
-  jq -n --arg t "$title" --argjson c "$combined" '{
+  jq --slurpfile c <(printf '%s' "$combined") --arg t "$title" -n '{
     object:"block", type:"toggle",
     toggle: {
       rich_text: [{ type:"text", text:{ content:$t } }],
-      children: $c
+      children: $c[0]
     }
   }'
 }
 
 append_blocks_chunked() {
-  # $1 page_id, stdin: JSON array
+  # $1 page_id, stdin: JSON array.
+  # Each 90-block chunk can still be 100KB+ (a single toggle with 95 inlined
+  # transcript paragraphs is huge), so route the chunk through --slurpfile +
+  # process substitution instead of --argjson to stay under MAX_ARG_STRLEN.
   local page_id="$1" blocks total i=0 chunk body
   blocks="$(cat)"
   total="$(jq 'length' <<< "$blocks")"
   while (( i < total )); do
     chunk="$(jq ".[${i}:$((i+90))]" <<< "$blocks")"
-    body="$(jq -n --argjson c "$chunk" '{children: $c}')"
+    body="$(jq --slurpfile c <(printf '%s' "$chunk") -n '{children: $c[0]}')"
     _api PATCH "/blocks/${page_id}/children" "$body" > /dev/null
     i=$((i+90))
   done
@@ -514,15 +726,36 @@ clear_page_children() {
 # ----- 3. Build row properties JSON -----
 build_row_props() {
   local title="$1" purpose="$2" audience="$3" input_url="$4" input_type="$5" created="$6" sources_count="$7"
-  # Required: Title (type: title). Others optional — include only when non-empty.
+  # Required: Title (type: title). Others optional — include only when non-empty
+  # AND (for select properties) when the value is in the database's enum set.
+  # Notion select rejects any value not in options AND rejects values with
+  # commas — so we whitelist-validate rather than passing free-form intent text.
   local created_prop='null'
   [[ -n "$created" ]] && created_prop="$(jq -n --arg d "$created" '{ date: { start: $d } }')"
   local input_type_prop='null'
-  [[ -n "$input_type" ]] && input_type_prop="$(jq -n --arg t "$input_type" '{ select: { name: $t } }')"
+  if [[ -n "$input_type" ]]; then
+    if _enum_match "$input_type" "$INPUT_TYPE_ENUM"; then
+      input_type_prop="$(jq -n --arg t "$input_type" '{ select: { name: $t } }')"
+    else
+      echo "push_to_notion: warn: input_type='$input_type' not in {$INPUT_TYPE_ENUM}, omitting" >&2
+    fi
+  fi
   local purpose_prop='null'
-  [[ -n "$purpose" ]] && purpose_prop="$(jq -n --arg t "$purpose" '{ select: { name: $t } }')"
+  if [[ -n "$purpose" ]]; then
+    if _enum_match "$purpose" "$PURPOSE_ENUM"; then
+      purpose_prop="$(jq -n --arg t "$purpose" '{ select: { name: $t } }')"
+    else
+      echo "push_to_notion: warn: purpose='$purpose' not in {$PURPOSE_ENUM}, omitting" >&2
+    fi
+  fi
   local audience_prop='null'
-  [[ -n "$audience" ]] && audience_prop="$(jq -n --arg t "$audience" '{ select: { name: $t } }')"
+  if [[ -n "$audience" ]]; then
+    if _enum_match "$audience" "$AUDIENCE_ENUM"; then
+      audience_prop="$(jq -n --arg t "$audience" '{ select: { name: $t } }')"
+    else
+      echo "push_to_notion: warn: audience='$audience' not in {$AUDIENCE_ENUM}, omitting" >&2
+    fi
+  fi
   local url_prop='null'
   [[ -n "$input_url" ]] && url_prop="$(jq -n --arg u "$input_url" '{ url: $u }')"
   jq -n \
@@ -618,12 +851,16 @@ add_slide_block "$REPORT_DIR/slides.pdf" "${SLUG}.pdf" \
   "application/pdf" \
   "빠른 미리보기용 PDF"
 
+# All BODY_BLOCKS concatenations below route through FDs (via jq_* helpers)
+# because the running blob accumulates README + transcript + related + session
+# and easily crosses MAX_ARG_STRLEN (131KB).
 if [[ "$(jq 'length' <<< "$SLIDE_BLOCKS")" != "0" ]]; then
-  BODY_BLOCKS="$(jq --argjson slides "$SLIDE_BLOCKS" -n --argjson b "$BODY_BLOCKS" '
-    $b + [
-      { "object":"block","type":"divider","divider":{} },
-      { "object":"block","type":"heading_2","heading_2":{"rich_text":[{"type":"text","text":{"content":"📎 슬라이드 덱"}}]} }
-    ] + $slides')"
+  SLIDE_HEADER_BLOCKS='[
+    { "object":"block","type":"divider","divider":{} },
+    { "object":"block","type":"heading_2","heading_2":{"rich_text":[{"type":"text","text":{"content":"📎 슬라이드 덱"}}]} }
+  ]'
+  BODY_BLOCKS="$(jq_concat_arrays "$BODY_BLOCKS" "$SLIDE_HEADER_BLOCKS")"
+  BODY_BLOCKS="$(jq_concat_arrays "$BODY_BLOCKS" "$SLIDE_BLOCKS")"
 fi
 
 # Divider + "부속 자료" heading before the toggles (if any attachment exists)
@@ -633,24 +870,25 @@ HAS_ATTACH=0
 [[ -d "$REPORT_DIR/related"       ]] && HAS_ATTACH=1
 
 if (( HAS_ATTACH )); then
-  BODY_BLOCKS="$(jq --argjson extra '[
+  EXTRA_BLOCKS='[
     { "object":"block","type":"divider","divider":{} },
     { "object":"block","type":"heading_2","heading_2":{"rich_text":[{"type":"text","text":{"content":"부속 자료"}}]} }
-  ]' -n --argjson b "$BODY_BLOCKS" '$b + $extra')"
+  ]'
+  BODY_BLOCKS="$(jq_concat_arrays "$BODY_BLOCKS" "$EXTRA_BLOCKS")"
 fi
 
 if [[ -f "$REPORT_DIR/transcript.md" ]]; then
   T="$(toggle_from_file "📝 Transcript" "$REPORT_DIR/transcript.md")"
-  BODY_BLOCKS="$(jq --argjson t "$T" -n --argjson b "$BODY_BLOCKS" '$b + [$t]')"
+  BODY_BLOCKS="$(jq_append_element "$BODY_BLOCKS" "$T")"
 fi
 if [[ -f "$REPORT_DIR/session.md" ]]; then
   T="$(toggle_from_file "💬 Followups" "$REPORT_DIR/session.md")"
-  BODY_BLOCKS="$(jq --argjson t "$T" -n --argjson b "$BODY_BLOCKS" '$b + [$t]')"
+  BODY_BLOCKS="$(jq_append_element "$BODY_BLOCKS" "$T")"
 fi
 if [[ -d "$REPORT_DIR/related" ]]; then
   T="$(toggle_from_related_dir "🔗 Related materials" "$REPORT_DIR/related")"
   if [[ "$T" != "null" ]]; then
-    BODY_BLOCKS="$(jq --argjson t "$T" -n --argjson b "$BODY_BLOCKS" '$b + [$t]')"
+    BODY_BLOCKS="$(jq_append_element "$BODY_BLOCKS" "$T")"
   fi
 fi
 
