@@ -32,10 +32,12 @@ fi
 WORDS=$(wc -w < "$OUTPUT" | awk '{print $1}')
 
 # Numbered citations [1], [2], etc — count occurrences (not unique).
-CITATIONS=$(grep -oE '\[[0-9]+\]' "$OUTPUT" | wc -l | tr -d ' ')
+# `grep -oE` exits 1 on zero matches; under set -euo pipefail that aborts the
+# script. `|| true` neutralizes that for the count-aggregation case.
+CITATIONS=$( { grep -oE '\[[0-9]+\]' "$OUTPUT" || true; } | wc -l | awk '{print $1}')
 
 # External links: any URL appearing as bare http(s):// or in markdown link form.
-LINKS=$(grep -oE 'https?://[^ )"]+' "$OUTPUT" | sort -u | wc -l | tr -d ' ')
+LINKS=$( { grep -oE 'https?://[^ )"]+' "$OUTPUT" || true; } | sort -u | wc -l | awk '{print $1}')
 
 # Token usage from raw.json (claude -p --output-format=json envelope).
 TOKENS_JSON="null"
