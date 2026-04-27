@@ -24,7 +24,7 @@ You MUST output exactly one JSON object, no markdown fences, no preamble:
 ## Scoring axes (0–10 each)
 
 1. **Coverage** — does the report touch the topic's core areas, or miss obvious ones?
-2. **Citation Quality** — are citations specific, traceable, and tied to claims (not decorative)?
+2. **Citation Quality** — are citations specific, traceable, tied to claims (not decorative), AND drawn from a diverse source pool? A report with 30 `[n]` markers all pointing back to 3 unique sources scores LOWER than one with 10 markers across 8 distinct sources. Forward citations and secondary references count even more than primary-paper repetition.
 3. **Depth** — does it surface real insight beyond surface summary?
 4. **Structure** — is there a usable TL;DR, hierarchy, navigable headings?
 
