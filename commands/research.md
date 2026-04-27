@@ -35,7 +35,7 @@ Branch by `input_type`:
 - **github** → `gh repo view <owner>/<repo> --json ...` + first 2 KB of README.
 - **huggingface** → `hf` CLI card summary.
 - **blog / community** → invoke the `firecrawl:firecrawl-scrape` skill (or `firecrawl:firecrawl` for more complex crawls) on the URL; take first 2 KB of markdown.
-- **topic** → `WebSearch` with `<target>` and keep the top 5 result titles + snippets.
+- **topic** → `WebSearch` with `<target>` and keep the top 10 result titles + snippets. (Top-10 widens the source pool so two consecutive runs share more overlap by chance, reducing the run-to-run source-set variance that bench reproducibility judges previously penalized.)
 
 Write the preview to `RESEARCH_DIR/<tmp-slug>/cache/preview-<cache_key>.json` (create dir if needed). Compute `cache_key` via `bash "${CLAUDE_PLUGIN_ROOT}/scripts/cache_key.sh" "<target>"`.
 
