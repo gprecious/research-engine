@@ -5,8 +5,33 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
 ## [Unreleased]
 
+## 0.9.0 — 2026-04-27
+
 ### Added
-- `/bench` slash command — repeatable mini-bench comparing research-engine vs Claude Code baseline on a topic × 2-mode × 2-trial matrix, with LLM-as-judge 5-axis rubric and improvement-opportunities report. Runs inside the user's session (RE mode invokes `Skill('research-engine:research')`; baseline dispatches a general-purpose subagent) because `claude -p` does not resolve plugin slash commands non-interactively.
+- `/bench` slash command — repeatable mini-bench comparing research-engine vs Claude Code baseline on a topic × 2-mode × 2-trial matrix, with LLM-as-judge 5-axis rubric (Coverage / Citation / Depth / Structure / Reproducibility) and improvement-opportunities report. Runs inside the user's session (RE mode invokes `Skill('research-engine:research')`; baseline dispatches a general-purpose subagent) because `claude -p` does not resolve plugin slash commands non-interactively. Outputs land under `bench/runs/<date>/report.md`.
+- `commands/research.md` Stage 5 — DO-NOT-SKIP checklist preamble. The 8 numbered steps must all complete; the LLM previously stopped after the markdown writes (steps 2–6) and silently skipped Notion mirror (step 7) and final-message format (step 8).
+- `lib/report_sections.md` §7 — required `한계 / 미해결 (Limitations)` section with explicit rules on what does / does not belong (≥2 bullets, never decorative). Driven by bench finding: vanilla-baseline reports surfaced limitations organically while RE reports omitted them entirely.
+- `lib/report_sections.md` §4 — input-type-aware sub-structure. For `arxiv` / `huggingface` inputs, §4 (상세 분석) MUST sub-divide into `방법론 / 핵심 메커니즘`, `실험 결과 / 벤치마크`, `저자 한계 / 미해결` with ≥2 findings each. For `github` / `context7`, analogous sub-headings (`구조 / 모듈`, `활성도 / 메인테이닝`, `사용 패턴`). Bench finding: dedup pass collapsed ablations / method details / evaluation-table entries into single bullets, costing ~2 points on the Depth axis for academic content.
+- `lib/report_sections.md` global rule — every factual claim sentence in §3 / §4 / §5 MUST end in at least one `[n]` marker. Mass-marker decorative citations at the end of long paragraphs are not acceptable. Unsourced factual claims must be removed, not retained without attribution. Bench finding: judges flagged RE citations as "decorative", "minimal", or "not tied to specific claims" on 4 of 5 cross-mode rationales.
+
+### Changed
+- `agents/arxiv-adapter.md` — PDF / HTML body fetch is now REQUIRED, not "only when needed for deep detail". Adapter must extract Method (§3), Experiments (§4), and any author-stated Limitations sections from the body, with concrete benchmark numbers in findings (not just abstract paraphrase). Findings count expanded 5–10 → 6–12 to accommodate body-derived content. Bench finding: RE produced 1517-word reports vs baseline 2752-word on the Mamba paper.
+- `commands/research.md` Stage 5 step 3 — dedupe is now input-type-aware (see Added entry for §4 sub-structure). Free-form by-topic merge remains for `youtube` / `blog` / `community`.
+
+### Fixed
+- `scripts/push_to_notion.sh` — RC#2: `PURPOSE_ENUM` / `AUDIENCE_ENUM` / `INPUT_TYPE_ENUM` whitelists with `_enum_match()` helper. `build_row_props` now warns and omits a select property when the value is not in the enum, instead of sending a 400-causing free-form value (e.g. `"캠핑 경험자, 프리미엄 텐트 …"`). Eliminates the "Notion push required fixing a comma-containing purpose field" recovery loop seen during bench runs.
+- `scripts/push_to_notion.sh` — RC#3: `jq_concat_arrays()` / `jq_append_element()` helpers using `<(printf '%s' "$VAR")` process substitution. Applied to 4 sites where multi-hundred-KB block JSON was passed via `jq --argjson` and hit Linux's `MAX_ARG_STRLEN` (~131 KB).
+- `scripts/push_to_notion.sh` — markdown rendering upgrade. Pipe tables → Notion `table` + `table_row` blocks. Emoji-led blockquotes (`> ⚠️`, `> 📒`, `> ℹ️`, `> 📸`, `> ✅`, `> 🚨`, …) → `callout` blocks with matching icon + color. Inline `**bold**` / `*italic*` / `` `code` `` / `[text](url)` preserved as `rich_text` annotations. Plain `>` still renders as quote.
+
+### Tests
+- `tests/bats/test_push_to_notion.bats` (new, 4 tests): RC#2 enum whitelist behavior + RC#3 large-input handling.
+- `tests/bats/test_collect_metrics.bats`, `tests/bats/test_judge.bats`, `tests/bats/test_report.bats`, `tests/bats/test_bench_run.bats` (new, 19 tests total): bench harness coverage.
+- Full suite now: 114/114 passing.
+
+### Notes — bench results
+- First full matrix run (`bench/findings/2026-04-27-summary.md`): RE 79.6 / Baseline 83.2 / Δ -3.6 averaged across 5 topics × N=2. Surfaced three P1 fixes (above).
+- After applying all three fixes, projected matrix: Δ +3.6 (RE outperforms baseline). Net swing **+7.2 points**. Two-of-five topics measured directly (`bench/findings/2026-04-27-v2-fix-validation.md` + `2026-04-27-v3-arxiv-substructure.md`); other three topics' deltas projected unchanged.
+- Re-validate post-release with `/bench` against the actually-installed v0.9.0 plugin.
 
 ## 0.8.2 — 2026-04-20
 
