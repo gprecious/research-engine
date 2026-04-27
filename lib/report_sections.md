@@ -73,6 +73,38 @@ If `intent_mode == "assumed"`, replace "사용자 답변" heading with "추정(a
 
 Structure subsections by topic, not by adapter. Merge findings that reinforce the same claim into one bullet with multiple `[src]` markers.
 
+### Input-type-aware sub-structure (REQUIRED for academic inputs)
+
+For `input_type: arxiv` or `huggingface`, §4 MUST use these sub-headings (omit a sub-heading only if the adapter returned zero findings for that bucket):
+
+```markdown
+## 상세 분석
+
+### 방법론 / 핵심 메커니즘
+
+- {{method_finding_1, with equation or named mechanism}} [{{src}}]
+- {{method_finding_2}} [{{src}}]
+- ...
+
+### 실험 결과 / 벤치마크
+
+- {{result_finding_1, with concrete number from paper body}} [{{src}}]
+- {{result_finding_2, e.g., ablation showing X drops Y to Z}} [{{src}}]
+- {{result_finding_3, e.g., zero-shot or downstream task numbers}} [{{src}}]
+- ...
+
+### 저자 한계 / 미해결
+
+- {{limitation_finding_1, marked by adapter as 저자가 명시한 한계}} [{{src}}]
+- ...
+```
+
+Minimum 2 fine-grained findings per sub-heading when content is available. Do NOT collapse method details, ablation rows, or evaluation-table entries into single summary lines — granularity IS the depth signal.
+
+For `github` / `context7` (code/docs), prefer sub-headings like `### 구조 / 모듈`, `### 활성도 / 메인테이닝`, `### 사용 패턴` when each has 2+ findings.
+
+For `youtube` / `blog` / `community`, free-form sub-headings by topic remain appropriate.
+
 ## §5. 인용 / 원문
 
 ```markdown
