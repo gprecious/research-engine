@@ -15,6 +15,13 @@
 #   --topic <id>   Restrict judge/report to one topic
 #   --force        Re-run judge even when judge.json exists
 #   --judge-model  Default: claude-sonnet-4-6
+#
+# NOTE on --judge: this dispatches judge.py which shells out to `claude -p`.
+# That subprocess hits subscription rate limits independently from the parent
+# Claude Code session and has historically failed with "credit balance too low".
+# Inside Claude Code, prefer the /bench slash command (commands/bench.md
+# Stage 4) which judges via Agent tool dispatch in-session. Use --judge here
+# only in raw-CLI environments (e.g., scripted runs with $ANTHROPIC_API_KEY).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -46,6 +46,15 @@ def build_repro_prompt(run1: str, run2: str, topic_id: str) -> str:
 
 def call_claude(prompt: str, model: str) -> str:
     """Invoke claude -p with the prompt; return stdout. Stdlib subprocess only."""
+    # NOTE: external `claude -p` subprocess hits subscription rate limits
+    # independently from the parent Claude Code session — multiple full-matrix
+    # bench runs have failed with "credit balance too low" here even when the
+    # parent session was healthy. The /bench slash command (commands/bench.md
+    # Stage 4) bypasses this code path entirely by dispatching the judge via
+    # Agent tool inside the parent session, which uses the parent's quota.
+    # This call_claude path is retained for non-Claude-Code environments
+    # (raw API key with `claude -p`) and `--from-fixture` tests; it is NOT
+    # the recommended judging path for /bench.
     system = PROMPT_FILE.read_text(encoding="utf-8")
     proc = subprocess.run(
         ["claude", "-p", "--model", model, "--system-prompt", system, prompt],

@@ -77,15 +77,19 @@ Filter by `--topic` if set. For each `topic_id`:
 
       **Mode-specific execution**:
 
-      - **RE mode**:
-        Determine target — if `url` is null/empty, use `topic_text = topic_id` with the `topic-` prefix stripped (e.g., `topic-mamba` → `mamba`). Otherwise use the url.
-        Invoke `Skill('research-engine:research', args='<target> --fresh --yes')`.
-        After /research's full pipeline finishes, the report dir is at `${WORKTREE}/research/<latest>/`. Find the most recent session dir:
-        ```
-        latest=$(ls -td "${WORKTREE}/research/"*/ 2>/dev/null | head -1)
-        ```
-        Copy `${latest}/README.md` to `${output}`.
-        If `${latest}/README.md` does not exist, write a single-line `output.md` containing `RE mode produced no README.md` and mark the run as failed in meta.json (set `status: "failed"`, `exit_code: 1`).
+      - **RE mode** — three steps, no others. Subagents have repeatedly skipped the post-Skill bookkeeping when the steps were spread across multiple bash blocks; the helper script collapses tail-bookkeeping into one call.
+        1. Snapshot:
+           ```bash
+           ls "${WORKTREE}/research/" 2>/dev/null | sort > /tmp/before-${topic_id}-${mode}-run${n}.txt
+           ```
+        2. Determine target — if `url` is null/empty, use `topic_text = topic_id` with the `topic-` prefix stripped. Otherwise use the url. Invoke `Skill('research-engine:research', args='<target> --fresh --yes')`. Follow ALL stages of /research; do not stop until Stage 5 is complete.
+        3. Bookkeeping (single call):
+           ```bash
+           bash "${CLAUDE_PLUGIN_ROOT}/bench/post_research_bookkeeping.sh" \
+             "${run_dir}" \
+             "/tmp/before-${topic_id}-${mode}-run${n}.txt"
+           ```
+           The helper diffs current research/ against the snapshot to locate the new session, copies its README.md to `${run_dir}/output.md`, runs `collect_metrics.sh`, and emits the meta.json. On failure (no new session, missing README), writes a `status: "failed"` meta.json and exits non-zero — do NOT manually retry; the matrix continues with the failure recorded.
 
       - **Baseline mode**:
         Substitute `{url}` (or `{topic}` when url is null) in `baseline_prompt` with the actual value.
