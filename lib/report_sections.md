@@ -2,6 +2,18 @@
 
 Used by `commands/research.md` during Stage 5 (Synthesize). Include only the sections whose inputs exist; omit empty sections instead of printing "N/A".
 
+## Citation enforcement (applies to §3, §4, §5)
+
+Every factual claim sentence in the body MUST end with at least one `[n]` marker tying the claim to a source. "Factual claim" means: any sentence that asserts a number, mechanism, named entity, dated event, comparison, or causal relationship. "Decorative" mass-marker citations at the end of long paragraphs are not acceptable — bind the marker to the specific claim sentence.
+
+Rules:
+- Connecting / framing sentences (e.g., "이 절에서는…", "다음으로 살펴볼 것은…") may omit `[n]`.
+- Direct quotes always carry the source `[n]`, plus `(timecode)` for YouTube.
+- If a single sentence draws on multiple sources, append all relevant ids: `... 이라고 보고됨 [3] [7]`.
+- If the synthesizer cannot find a source for a claim, the claim must be removed — never leave an unsourced factual statement in the report.
+
+This rule is absolute for §3 (핵심 포인트), §4 (상세 분석), §5 (인용 / 원문). It is recommended but not required for §1 (분석 목적), §2 (요약), and §7 (한계 / 미해결).
+
 ## Frontmatter (required)
 
 ```markdown
