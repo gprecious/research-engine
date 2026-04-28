@@ -58,3 +58,12 @@ teardown() { rm -rf "$TMPDIR_T"; }
   tokens=$(jq -r '.model_tokens' "$TMPDIR_T/meta.json")
   [ "$tokens" = "null" ]
 }
+
+@test "unique_citation_n_count counts distinct [n] markers (not total)" {
+  "$SCRIPT" "$TMPDIR_T" 1700000000 1700000612
+  uniq=$(jq -r '.unique_citation_n_count' "$TMPDIR_T/meta.json")
+  cit=$(jq -r '.citation_count' "$TMPDIR_T/meta.json")
+  # fixture has [1] [2] [3] markers — 3 unique IDs total
+  [ "$uniq" -eq 3 ]
+  [ "$cit" -ge "$uniq" ]
+}

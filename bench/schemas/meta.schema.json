@@ -8,6 +8,7 @@
     "wall_time_sec": { "type": "integer", "minimum": 0 },
     "word_count": { "type": "integer", "minimum": 0 },
     "citation_count": { "type": "integer", "minimum": 0 },
+    "unique_citation_n_count": { "type": "integer", "minimum": 0 },
     "external_link_count": { "type": "integer", "minimum": 0 },
     "model_tokens": {
       "type": ["object", "null"],

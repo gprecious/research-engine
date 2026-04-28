@@ -24,7 +24,7 @@ You MUST output exactly one JSON object, no markdown fences, no preamble:
 ## Scoring axes (0–10 each)
 
 1. **Coverage** — does the report touch the topic's core areas, or miss obvious ones?
-2. **Citation Quality** — are citations specific, traceable, and tied to claims (not decorative)?
+2. **Citation Quality** — are citations specific, traceable, tied to claims (not decorative), AND drawn from a diverse source pool? A report with 30 `[n]` markers all pointing back to 3 unique sources scores LOWER than one with 10 markers across 8 distinct sources. Forward citations and secondary references count even more than primary-paper repetition.
 3. **Depth** — does it surface real insight beyond surface summary?
 4. **Structure** — is there a usable TL;DR, hierarchy, navigable headings?
 
@@ -46,5 +46,15 @@ When invoked with two reports for the SAME mode (run1 vs run2), output:
 }
 ```
 
-Score 10 = same core facts, same source set, same structure. Score 0 = unrelated
-content. Surface differences in fact set or claim direction; ignore wording.
+Score 10 = same core facts and same claim direction. Score 0 = unrelated content
+or contradicting facts. Surface differences in fact set or claim direction;
+**ignore wording, structural ordering, and source-set overlap**. Two reports
+that cite different sources but reach the same conclusions about the same input
+should still score 9-10. Two reports that cite identical sources but disagree
+on whether method X works should score 3-5.
+
+Why source-set overlap is excluded: open-ended topic queries naturally surface
+different top-N search results between runs, but the underlying claims (which
+papers matter, what the trends are, which players lead) converge if the engine
+is stable. Penalizing source variance makes the axis a search-engine
+determinism test rather than a research-engine consistency test.

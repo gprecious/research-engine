@@ -34,7 +34,23 @@ You are the **arxiv-adapter**. Analyze a single arXiv paper (or URL that resolve
    - Evaluation results with concrete numbers from the body (2–3 findings)
    - Authors' stated limitations (1–2, marked clearly as `(저자가 명시한 한계)` so the synthesis stage can route them to §7)
    - **Every finding's `text` must end in at least one `[src]` marker tied to a real source id**, NOT decorative. The orchestrator down-counts findings whose body claims aren't traceable.
-5. **Related work** — list 3–7 `related[]` entries (other papers cited for context, plus any official/community implementations found via paper-page links or a single `firecrawl search` for `"<paper title>" github`).
+5. **Related work — three distinct provenance buckets, 5–12 entries total.** Single-bucket lists ("just author-cited papers") are insufficient — the bench shows that vanilla web search routinely beats RE on this axis because it traverses forward + sideways, not just author-cited prior art. Each `related[]` entry MUST have:
+   - `kind`: `paper` / `repo` / `blog` / `docs`
+   - `url`
+   - `title`
+   - `relation`: a specific phrase tying it to the analyzed paper (NOT "for context" / "related work"). Examples: `"cited as prior art for the selection mechanism (§2.3)"`, `"follow-up that scales to 7B"`, `"official implementation"`, `"community reproduction with PyTorch hooks"`.
+
+   **Bucket a — Author-cited prior art (2–4 entries)**:
+   From the body's `§Related Work` (or equivalent): pick the most-substantive prior works the authors discuss. For each, note WHICH section of the analyzed paper cites it.
+
+   **Bucket b — Forward citations / follow-ups (2–4 entries)**:
+   Use the HF paper page (`https://huggingface.co/papers/<arxiv_id>`) — `firecrawl scrape` it and extract the "Citations" / "References" / "Trending Papers" sections. If HF doesn't list any, `firecrawl scrape https://www.semanticscholar.org/arxiv/<arxiv_id>` and pull the top citing-papers. Capture follow-ups that improve, contradict, or extend the analyzed work — NOT just papers that mention it.
+
+   **Bucket c — Implementations + venue discussion (1–4 entries)**:
+   Official GitHub via the paper-page's linked-repo metadata. If a community implementation exists, `firecrawl search` for `"<paper title>" github` (max 1 call) — pick the highest-starred non-author fork. If the paper has an OpenReview thread (search via `firecrawl search` for `"<paper title>" openreview`), include the URL with `relation: "OpenReview discussion — note reviewer concerns about <X>"`.
+
+   When any bucket returns zero useful entries (e.g., a brand-new paper with no follow-ups yet), record a single `failures[]` entry like `{step: "secondary_refs.bucket_b", error: "no_follow_ups_yet"}` and continue — do NOT pad the bucket with low-relevance fillers.
+
 6. **Intent tailoring** — if `intent.purpose` is "의사결정", emphasize strengths vs alternatives and deployment caveats; if "학습", emphasize method and notation.
 
 ## Output contract

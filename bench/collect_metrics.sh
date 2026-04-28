@@ -36,6 +36,12 @@ WORDS=$(wc -w < "$OUTPUT" | awk '{print $1}')
 # script. `|| true` neutralizes that for the count-aggregation case.
 CITATIONS=$( { grep -oE '\[[0-9]+\]' "$OUTPUT" || true; } | wc -l | awk '{print $1}')
 
+# Unique citation source IDs — counts distinct [n] numbers, NOT total occurrences.
+# A report with `[1]` repeated 30 times has unique_citation_n_count = 1, even
+# if citation_count = 30. The diversity ratio (citation_count / unique) tells
+# the bench whether citations are diverse or repetitive.
+UNIQUE_CIT=$( { grep -oE '\[[0-9]+\]' "$OUTPUT" || true; } | sort -u | wc -l | awk '{print $1}')
+
 # External links: any URL appearing as bare http(s):// or in markdown link form.
 LINKS=$( { grep -oE 'https?://[^ )"]+' "$OUTPUT" || true; } | sort -u | wc -l | awk '{print $1}')
 
@@ -53,7 +59,8 @@ jq -n \
   --argjson wall "$WALL" \
   --argjson words "$WORDS" \
   --argjson cit "$CITATIONS" \
+  --argjson uniq_cit "$UNIQUE_CIT" \
   --argjson links "$LINKS" \
   --argjson tokens "$TOKENS_JSON" \
-  '{status:"ok", wall_time_sec:$wall, word_count:$words, citation_count:$cit, external_link_count:$links, model_tokens:$tokens, exit_code:0}' \
+  '{status:"ok", wall_time_sec:$wall, word_count:$words, citation_count:$cit, unique_citation_n_count:$uniq_cit, external_link_count:$links, model_tokens:$tokens, exit_code:0}' \
   > "$META"
