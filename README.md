@@ -1,6 +1,6 @@
 # research-engine
 
-Deep research via Claude Code slash commands. Give it a URL or a topic — it returns a structured markdown report with citations.
+Deep research via Claude Code slash commands or the Codex skill. Give it a URL or a topic — it returns a structured markdown report with citations.
 
 ## Installation
 
@@ -12,6 +12,23 @@ claude plugin install research-engine@gprecious-marketplace
 ```
 
 Then restart Claude Code or run `/plugins reload`. Updates via `claude plugin update research-engine@gprecious-marketplace` once a new version is published.
+
+### Codex plugin install
+
+This repository also contains a Codex-compatible plugin manifest and skill:
+
+```text
+.codex-plugin/plugin.json
+skills/research-engine/SKILL.md
+```
+
+Install it the same way you install local Codex plugins in your environment, pointing the plugin source at this repository. After the plugin is available, ask Codex for research directly, for example:
+
+```text
+Use research-engine to research https://arxiv.org/abs/2402.10171 --yes
+Use research-engine to research "MoE LLM routing improvements" --yes
+Use research-engine to follow up on the latest session: "저자 한계만 더 정리해줘"
+```
 
 ### Local development install (for contributors)
 
@@ -37,6 +54,8 @@ Tip: once installed, replace the snapshot in `~/.claude/plugins/cache/research-e
 
 ## Usage
 
+### Claude Code slash commands
+
 ```
 /research https://youtu.be/xxxxx          # analyze a YouTube video
 /research https://arxiv.org/abs/2301.xxxx # analyze a paper
@@ -55,9 +74,35 @@ Tip: once installed, replace the snapshot in `~/.claude/plugins/cache/research-e
 /research-visualize <slug> --slides --brand-image <url>    # watermark chart background via QuickChart plugin
 /research-visualize <slug> --no-sync-notion                # skip Notion push
 /research-visualize                                         # use most recent session
+
+/research-design <slug>                                    # research → claude.ai/design → LXC 배포
+/research-design <slug> --no-deploy                        # 로컬 산출물까지만
+/research-design <slug> --login-headful                    # cloak skip, Tailscale m4 로 1회 로그인
+/research-design <slug> --fresh                            # storageState 캐시 무시
 ```
 
 Output lands in `research/YYYY-MM-DD-<slug>/README.md`. When Notion is configured, a consolidated report is also upserted as a row in a `research-engine` database under the configured parent page (one row per session, re-runs update in place).
+
+### AI agent instructions
+
+Agents that cannot execute Claude Code slash commands should use `skills/research-engine/SKILL.md` as the entrypoint and treat the command files as the canonical pipeline reference:
+
+- `commands/research.md` defines the full classify → preview → intent → evidence → synthesize → persist workflow.
+- `commands/research-followup.md` defines session follow-ups.
+- `lib/adapter_contract.md` defines the normalized evidence JSON shape.
+- `lib/report_sections.md` defines the required markdown report sections and citation rules.
+- `agents/*-adapter.md` defines source-specific collection behavior.
+
+For a new research run, create `research/YYYY-MM-DD-<slug>/README.md`, `sources.json`, and `intent.json`. Use the same report structure as `lib/report_sections.md`; every factual claim in `핵심 포인트`, `상세 분석`, and `인용 / 원문` must cite a real source id such as `[1]`.
+
+For Codex specifically:
+
+1. Use the `research-engine` skill when the request asks for URL, paper, repo, video, blog, docs, community, or topic research.
+2. Use Codex web/search/file tools in place of Claude `WebSearch`, `WebFetch`, `Read`, `Write`, and `Edit`.
+3. Use Codex subagents only when the user explicitly allows delegation or parallel agents; otherwise collect the adapter evidence directly.
+4. Use shell scripts in `scripts/` for deterministic helper behavior such as URL classification, slugging, cache keys, YouTube metadata, latest-session lookup, and Notion mirroring.
+5. Preserve the output contract: cited Korean markdown report, machine-readable `sources.json`, saved `intent.json`, optional `transcript.md`, optional `related/`, and append-only `session.md` for follow-ups.
+6. Before reporting success, verify the artifacts exist and that cited `[n]` markers map to `sources.json`.
 
 ### Bench mode
 
@@ -129,6 +174,15 @@ When Notion is configured, the final stage auto-pushes the patched README back t
 - Design spec: `docs/superpowers/specs/2026-04-16-research-engine-design.md`
 - Implementation plan: `docs/superpowers/plans/2026-04-16-research-engine.md`
 - Contributor guide: `DEVELOPMENT.md`
+
+### Optional: `/research-design` deps
+
+- Node 22 + pnpm 9, `pnpm install`
+- Playwright chromium: `pnpm exec playwright install chromium --with-deps`
+- cloak-browser (lazy install)
+- `.env.research-design` (`.env.research-design.example` 참조)
+- herdr session (`HERDR_ENV=1`), Tailscale, hetzner-master ssh
+- 새 슬러그 추가 시: `research/<slug>/design/scenarios.json` 은 `git add -f` 필요 (`.gitignore` 의 blanket `research/` 때문)
 
 ## Known limitations
 

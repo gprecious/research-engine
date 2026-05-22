@@ -1,0 +1,35 @@
+{
+  "name": "research-engine",
+  "version": "0.10.0",
+  "description": "Deep research engine for URLs and topic keywords. Produces structured markdown reports with source attribution and reproducible research artifacts.",
+  "author": {
+    "name": "gprecious",
+    "email": "yprecious@gmail.com",
+    "url": "https://github.com/gprecious"
+  },
+  "repository": "https://github.com/gprecious/research-engine",
+  "keywords": [
+    "research",
+    "deep-research",
+    "citations",
+    "markdown"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Research Engine",
+    "shortDescription": "Research URLs or topics into cited markdown reports.",
+    "longDescription": "Run the research-engine workflow from Codex: classify a URL or topic, gather evidence, synthesize a cited Korean markdown report, and persist artifacts under research/<date>-<slug>/.",
+    "developerName": "gprecious",
+    "category": "Productivity",
+    "capabilities": [
+      "Research",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Research this URL and write a cited report.",
+      "Research this topic with primary sources.",
+      "Follow up on the latest research session."
+    ],
+    "brandColor": "#2563EB"
+  }
+}

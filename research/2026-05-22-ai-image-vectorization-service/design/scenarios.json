@@ -1,0 +1,35 @@
+{
+  "$schema": "../../../tests/research-design/schemas/scenarios.schema.json",
+  "slug": "2026-05-22-ai-image-vectorization-service",
+  "baseUrl": { "local": "http://localhost:3000" },
+  "scenarios": [
+    {
+      "name": "landing-hero-cta",
+      "steps": [
+        { "goto": "/" },
+        { "expect": { "selector": "h1", "containsText": "vectoriz" } },
+        { "click": "[data-testid=cta-try]" },
+        { "expect": { "url": "/upload" } }
+      ]
+    },
+    {
+      "name": "upload-and-preview",
+      "steps": [
+        { "goto": "/upload" },
+        { "setInputFiles": ["input[type=file]", "tests/research-design/fixtures/sample.png"] },
+        { "click": "[data-testid=convert]" },
+        { "waitForSelector": "[data-testid=svg-preview] svg", "timeout": 15000 },
+        { "expectNoConsoleError": true }
+      ]
+    },
+    {
+      "name": "health-and-no-runtime-error",
+      "steps": [
+        { "fetch": "/health", "expectStatus": 200 },
+        { "goto": "/" },
+        { "expectNoConsoleError": true },
+        { "expectNoNetworkFailure": ["/_next/", "/api/"] }
+      ]
+    }
+  ]
+}

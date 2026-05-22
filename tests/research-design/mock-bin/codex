@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+echo "[mock codex] $*" >&2
+echo '{"status":"ok"}'
+exit 0

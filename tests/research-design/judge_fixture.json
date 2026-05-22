@@ -1,0 +1,17 @@
+{
+  "inputs": {
+    "appScreenshotPath": "tests/research-design/fixtures/handoff-stub/index.html",
+    "designScreenshotPath": "tests/research-design/fixtures/handoff-stub/index.html",
+    "scenarios": {
+      "$ref": "research/2026-05-22-ai-image-vectorization-service/design/scenarios.json"
+    }
+  },
+  "expectedOutputShape": {
+    "designQuality": "number 0-100",
+    "originality": "number 0-100",
+    "craft": "number 0-100",
+    "functionality": "number 0-100",
+    "total": "number (avg, 0-100)",
+    "axisNotes": "object with one note per axis"
+  }
+}
