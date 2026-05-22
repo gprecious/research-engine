@@ -5,6 +5,13 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
 ## [Unreleased]
 
+## [0.11.0]
+
+### Added
+- `/research-design <slug>` — claude.ai/design 자동화 → claude/codex 병렬 빌드 → hetzner-master LXC 배포
+- 3중 게이트: Playwright e2e + 4축 LLM judge (G1/G2/G3)
+- cloak-browser 자동 로그인 → Tailscale m4 수동 폴백
+
 ## 0.10.0 — 2026-04-28
 
 Driven by the v0.9.0 full-matrix bench (`bench/findings/2026-04-27-v0.9.0-validation.md`) which surfaced four follow-ups: arxiv depth gap, topic-mode reproducibility crash, citation diversity opacity, and bench harness UX.
