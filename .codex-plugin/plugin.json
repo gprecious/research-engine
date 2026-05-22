@@ -1,6 +1,6 @@
 {
   "name": "research-engine",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Deep research engine for URLs and topic keywords. Produces structured markdown reports with source attribution and reproducible research artifacts.",
   "author": {
     "name": "gprecious",
