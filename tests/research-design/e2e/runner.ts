@@ -50,7 +50,7 @@ async function runStep(
   if ('goto' in step) {
     await page.goto(step.goto);
   } else if ('click' in step) {
-    await page.click(step.click);
+    await page.locator(step.click).first().click();
   } else if ('setInputFiles' in step) {
     const [selector, path] = step.setInputFiles;
     await page.setInputFiles(selector, resolve(path));

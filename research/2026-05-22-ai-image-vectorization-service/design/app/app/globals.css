@@ -1,0 +1,54 @@
+:root {
+  /* Vectra design tokens — verbatim from claude.ai/design v5 handoff (project c13be0bc) */
+  --color-brand: #2f6bff;
+  --color-brand-dark: #1f55e0;
+  --color-ink: #0b0d12;
+  --color-muted: #6b7280;
+  --color-line: rgba(11, 13, 18, 0.08);
+  --color-soft: #f6f7f9;
+  --color-bg: #ffffff;
+
+  --text-h1: 56px;
+  --text-h2: 28px;
+  --text-body: 16px;
+
+  --shadow-sm: 0 0 10px 1px rgb(0 0 0 / 3%);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; min-height: 100%; background: var(--color-bg); }
+body {
+  color: var(--color-ink);
+  font-family: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  font-size: var(--text-body);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+button { font-family: inherit; cursor: pointer; }
+a { color: inherit; }
+::selection { background: var(--color-brand); color: #fff; }
+
+/* From handoff index.html — page texture + animations (verbatim) */
+.hero-grid {
+  background-image:
+    linear-gradient(to right, rgba(11,13,18,0.04) 1px, transparent 1px);
+  background-size: 88px 100%;
+}
+
+@keyframes vectra-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@keyframes vectra-fadeup {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes vectra-tracePath {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes vectra-dot {
+  0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+  40% { transform: scale(1); opacity: 1; }
+}
+.v-fadeup { animation: vectra-fadeup 0.5s ease both; }

@@ -1,6 +1,9 @@
 # `2026-05-22-ai-image-vectorization-service` — `/research-design` 첫 e2e 결과
 
 본 디렉토리는 `/research-design` 의 **첫 end-to-end 실행** 결과물 (시드 슬러그).
+
+> **v3 업데이트 (2026-05-22 23:43 KST)** — claude.ai/design 이 페이지 파일 (`landing.jsx`, `upload.jsx`, `health.jsx`, `app.jsx`) 모두 완성. v5 handoff bundle (`handoff/v5/`) 이 정식 산출물. Next.js TSX (`app/app/*`) 는 그 bundle 의 **mechanical port** (hash router → Next.js routing 만 교체, 시각 변경 없음). E2E 3/3 PASS @ http://localhost:3000.
+
 2회 시도, 두 번째 시도에서 진짜 디자인 산출물을 받고 그것을 적용한 working app 으로 마무리.
 
 ## 흐름 요약 — 실 실행
