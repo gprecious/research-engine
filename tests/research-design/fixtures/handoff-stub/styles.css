@@ -1,0 +1,4 @@
+:root { --bg: #f6f8fb; --fg: #0a0a2a; --accent: #6c4cff; }
+body { background: var(--bg); color: var(--fg); font-family: system-ui; margin: 0; }
+header { padding: 48px 24px; text-align: center; }
+.cta { background: var(--accent); color: white; padding: 12px 24px; border-radius: 8px; border: 0; }

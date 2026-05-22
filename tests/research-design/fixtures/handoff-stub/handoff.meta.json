@@ -1,0 +1,10 @@
+{
+  "tool": "claude.ai/design",
+  "exportedAt": "2026-05-22T01:00:00Z",
+  "title": "AI Image Vectorization",
+  "designSystem": {
+    "colors": { "bg": "#f6f8fb", "fg": "#0a0a2a", "accent": "#6c4cff" },
+    "typography": { "base": "system-ui" }
+  },
+  "components": ["hero", "upload"]
+}
