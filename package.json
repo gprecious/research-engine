@@ -9,9 +9,11 @@
     "test:bats": "bats tests/research-design/pipeline.test.sh"
   },
   "devDependencies": {
+    "@playwright/test": "^1.45.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
-    "vitest": "^1.6.0",
-    "@playwright/test": "^1.45.0"
+    "cloakbrowser": "^0.3.30",
+    "playwright": "^1.60.0",
+    "vitest": "^1.6.0"
   }
 }

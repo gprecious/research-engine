@@ -8,24 +8,22 @@
 import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { execSync, spawnSync } from 'node:child_process';
-import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
 import { loadEnv, requireEnv } from '../lib/research_design_env.mjs';
-
-const require = createRequire(import.meta.url);
 
 const CACHE_DIR = join(homedir(), '.config', 'research-engine', 'claude-design');
 const STATE_PATH = join(CACHE_DIR, 'storageState.json');
 const META_PATH = join(CACHE_DIR, 'state.meta.json');
 
 function ensureCloakBrowser() {
-  try {
-    require.resolve('cloak-browser');
-  } catch {
-    console.error('[cloak] cloak-browser not found — installing locally');
-    const result = spawnSync('pnpm', ['add', '-D', 'cloak-browser', 'playwright'], { stdio: 'inherit' });
+  // cloakbrowser is ESM-only (no CJS exports), so require.resolve() always throws.
+  // Use filesystem check instead.
+  const pkgPath = new URL('../node_modules/cloakbrowser/package.json', import.meta.url);
+  if (!existsSync(pkgPath)) {
+    console.error('[cloak] cloakbrowser not found — installing locally');
+    const result = spawnSync('pnpm', ['add', '-D', 'cloakbrowser', 'playwright'], { stdio: 'inherit' });
     if (result.status !== 0) {
-      console.error('[cloak] cloak-browser install failed — continuing (may fail at import)');
+      console.error('[cloak] cloakbrowser install failed — continuing (may fail at import)');
     }
   }
 }
@@ -35,11 +33,10 @@ async function main() {
   const env = loadEnv();
   const { CLAUDE_LOGIN_EMAIL, CLAUDE_LOGIN_PW } = requireEnv(['CLAUDE_LOGIN_EMAIL', 'CLAUDE_LOGIN_PW'], env);
 
-  const { stealth } = await import('cloak-browser');
-  const { chromium } = await import('playwright');
+  const { launch } = await import('cloakbrowser');
 
-  const browser = await chromium.launch({ headless: true });
-  const context = await stealth(browser).newContext();
+  const browser = await launch({ headless: true });
+  const context = await browser.newContext();
   const page = await context.newPage();
 
   await page.goto('https://claude.ai/login', { waitUntil: 'domcontentloaded' });
