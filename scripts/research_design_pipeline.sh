@@ -7,15 +7,21 @@ SLUG=""
 NO_DEPLOY=0
 LOGIN_HEADFUL=0
 FRESH=0
+FROM_URL=""
 
+# Need to scan with index to capture --from-url's value
+i=1
 for a in "$@"; do
   case "$a" in
     --no-deploy) NO_DEPLOY=1 ;;
     --login-headful) LOGIN_HEADFUL=1 ;;
     --fresh) FRESH=1 ;;
-    --*) echo "unknown flag $a" >&2; exit 2 ;;
-    *) SLUG="$a" ;;
+    --from-url) FROM_URL="${!((i+1))}" ;;
+    --from-url=*) FROM_URL="${a#--from-url=}" ;;
+    --*) ;;  # tolerated, may be value for --from-url
+    *) [[ -z "${SLUG}" && "$a" != http* ]] && SLUG="$a" ;;
   esac
+  i=$((i+1))
 done
 
 [[ -n "${SLUG}" ]] || { echo "slug required" >&2; exit 2; }
@@ -48,9 +54,32 @@ if [[ "${LOGIN_HEADFUL}" == "1" ]]; then
   node scripts/manual_login.mjs || { log fatal "manual_login failed"; exit 1; }
 fi
 
-log collect.start ""
-node scripts/design_collect.mjs "${SLUG}" 2>&1 | tee -a "${RUN_DIR}/collect.log"
-log collect.done ""
+if [[ "${RESEARCH_DESIGN_SKIP_COLLECT:-0}" == "1" && -d "research/${SLUG}/design/handoff" ]]; then
+  log collect.skip "using existing handoff/"
+else
+  log collect.start ""
+  set +e
+  if [[ -n "${FROM_URL}" ]]; then
+    node scripts/design_collect.mjs "${SLUG}" --from-url "${FROM_URL}" 2>&1 | tee -a "${RUN_DIR}/collect.log"
+  else
+    node scripts/design_collect.mjs "${SLUG}" 2>&1 | tee -a "${RUN_DIR}/collect.log"
+  fi
+  COLLECT_RC=${PIPESTATUS[0]}
+  set -e
+  if [[ "${COLLECT_RC}" == "11" ]]; then
+    log collect.manual "design_collect printed manual prompt — pipeline halted"
+    echo >&2
+    echo "[pipeline] 수동 진행 필요. 위 안내대로 claude.ai/design 사용 후" >&2
+    echo "[pipeline]   bash scripts/research_design_pipeline.sh ${SLUG} --from-url <URL>" >&2
+    echo "[pipeline] 재실행." >&2
+    exit 11
+  fi
+  if [[ "${COLLECT_RC}" != "0" ]]; then
+    log collect.fail "exit ${COLLECT_RC}"
+    exit "${COLLECT_RC}"
+  fi
+  log collect.done ""
+fi
 
 log orchestrate.start ""
 bash scripts/herdr_orchestrate.sh "${SLUG}" "${RUN_DIR}"
