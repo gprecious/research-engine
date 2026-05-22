@@ -16,3 +16,10 @@ venv/
 
 # bench raw outputs are reproducible — only design + harness + findings are committed.
 bench/runs/
+
+# local Claude Code workspace + Playwright MCP scratch
+.claude/
+.playwright-mcp/
+
+# ad-hoc UI-verification screenshots saved at repo root
+/*.png
