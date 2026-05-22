@@ -23,3 +23,13 @@ bench/runs/
 
 # ad-hoc UI-verification screenshots saved at repo root
 /*.png
+
+# research-design
+.env.research-design
+test-results/
+playwright-report/
+research/*/design/runs/
+research/*/design/handoff/
+research/*/design/app/
+# allow hand-authored contract files
+!research/*/design/scenarios.json
