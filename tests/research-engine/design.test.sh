@@ -1,8 +1,9 @@
 #!/usr/bin/env bats
 
+SLUG="2026-05-23-design-test-fixture"
+TARGET="research/${SLUG}"
+
 setup() {
-  SLUG="2026-05-23-design-test-fixture"
-  TARGET="research/${SLUG}"
   mkdir -p "${TARGET}/spec" "${TARGET}/design/handoff"
   echo "# Test fixture" > "${TARGET}/README.md"
   echo "## Test spec" > "${TARGET}/spec/spec.md"
@@ -12,7 +13,7 @@ setup() {
 }
 
 teardown() {
-  rm -rf "research/2026-05-23-design-test-fixture"
+  rm -rf "${TARGET}"
 }
 
 @test "design script exists and is executable" {
@@ -26,10 +27,10 @@ teardown() {
 }
 
 @test "design detects cached handoff and skips claude.ai automation" {
-  run scripts/design_collect_only.sh "2026-05-23-design-test-fixture"
+  run scripts/design_collect_only.sh "${SLUG}"
   [ "$status" -eq 0 ]
   [[ "$output" == *"using existing handoff"* ]]
-  [ -f "research/2026-05-23-design-test-fixture/design/handoff/index.html" ]
-  [ -f "research/2026-05-23-design-test-fixture/design/handoff/meta.json" ]
-  ls research/2026-05-23-design-test-fixture/design/runs/ | grep -q '^[0-9]'
+  [ -f "${TARGET}/design/handoff/index.html" ]
+  [ -f "${TARGET}/design/handoff/meta.json" ]
+  ls "${TARGET}/design/runs/" | grep -q '^[0-9]'
 }

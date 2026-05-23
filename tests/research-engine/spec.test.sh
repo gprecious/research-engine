@@ -1,9 +1,10 @@
 #!/usr/bin/env bats
 
+SLUG="2026-05-23-spec-test-fixture"
+TARGET="research/${SLUG}"
+
 setup() {
   export PATH="$(pwd)/tests/research-engine/mock-bin:$PATH"
-  SLUG="2026-05-23-spec-test-fixture"
-  TARGET="research/${SLUG}"
   mkdir -p "${TARGET}"
   cat > "${TARGET}/README.md" <<EOF
 # Test fixture for /spec
@@ -15,7 +16,7 @@ JSON
 }
 
 teardown() {
-  rm -rf "research/2026-05-23-spec-test-fixture"
+  rm -rf "${TARGET}"
 }
 
 @test "spec script exists and is executable" {
@@ -35,15 +36,16 @@ teardown() {
 }
 
 @test "spec generates scenarios.json with valid schema + _meta + spec.md" {
-  run scripts/spec_generate.sh "2026-05-23-spec-test-fixture"
+  run scripts/spec_generate.sh "${SLUG}"
   [ "$status" -eq 0 ]
-  [ -f "research/2026-05-23-spec-test-fixture/spec/scenarios.json" ]
-  [ -f "research/2026-05-23-spec-test-fixture/spec/spec.md" ]
-  jq -e '._meta.source_intent_hash' "research/2026-05-23-spec-test-fixture/spec/scenarios.json"
-  jq -e '.scenarios | length >= 3' "research/2026-05-23-spec-test-fixture/spec/scenarios.json"
+  [ -f "${TARGET}/spec/scenarios.json" ]
+  [ -f "${TARGET}/spec/spec.md" ]
+  jq -e '._meta.source_intent_hash' "${TARGET}/spec/scenarios.json"
+  jq -e '.scenarios | length >= 3' "${TARGET}/spec/scenarios.json"
 }
 
 @test "spec writes runs/<ISO>/log.jsonl" {
-  scripts/spec_generate.sh "2026-05-23-spec-test-fixture"
-  ls research/2026-05-23-spec-test-fixture/spec/runs/ | grep -q '^[0-9]'
+  run scripts/spec_generate.sh "${SLUG}"
+  [ "$status" -eq 0 ]
+  ls "${TARGET}/spec/runs/" | grep -q '^[0-9]'
 }
