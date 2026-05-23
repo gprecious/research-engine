@@ -5,6 +5,14 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
 ## [Unreleased]
 
+## [0.12.1]
+
+### Changed
+- `lib/scenarios_validator.mjs` — `strict: true` (draft-2020-12 인식, 스키마 작성 버그 컴파일타임 검출) + `validate.errors` 즉시 캡처 (race-safe).
+- `tests/research-engine/schemas/scenarios.schema.json` — `baseUrl.additionalProperties: false` (stray 필드 거부).
+- `package.json` — `test:unit` 가 `lib/` 디렉터리 포함 → `scenarios_validator` 단위 테스트 보호.
+- bats 테스트 3종 — `SLUG`/`TARGET` 파일 스코프 변수화, teardown 하드코딩 제거.
+
 ## [0.12.0]
 
 ### Added
