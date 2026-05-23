@@ -1,0 +1,27 @@
+{
+  "slug": "2026-05-23-test-fixture",
+  "baseUrl": { "local": "http://localhost:3000", "prod": "https://example.ts.net" },
+  "scenarios": [
+    {
+      "name": "landing",
+      "steps": [
+        { "goto": "/" },
+        { "expect": { "selector": "h1" } },
+        { "expectNoConsoleError": true }
+      ]
+    },
+    {
+      "name": "second-flow",
+      "steps": [
+        { "goto": "/about" },
+        { "expectNoConsoleError": true }
+      ]
+    },
+    {
+      "name": "health",
+      "steps": [
+        { "fetch": "/health", "expectStatus": 200 }
+      ]
+    }
+  ]
+}
