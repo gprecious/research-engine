@@ -9,7 +9,7 @@ TARGET="lxc"
 i=1
 for a in "$@"; do
   case "$a" in
-    --target) TARGET="${!((i+1))}" ;;
+    --target) n=$((i+1)); TARGET="${!n}" ;;
     --target=*) TARGET="${a#--target=}" ;;
     --*) ;;
     *) [[ -z "${SLUG}" ]] && SLUG="$a" ;;
