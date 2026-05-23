@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gprecious/research-engine/schemas/scenarios.json",
+  "title": "research-engine e2e scenarios",
+  "type": "object",
+  "required": ["slug", "baseUrl", "scenarios"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "slug": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+$" },
+    "baseUrl": {
+      "type": "object",
+      "required": ["local"],
+      "properties": {
+        "local": { "type": "string", "format": "uri" },
+        "prod": { "type": "string", "format": "uri" }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["name", "steps"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+          "steps": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "oneOf": [
+                { "required": ["goto"], "properties": { "goto": { "type": "string" } } },
+                { "required": ["click"], "properties": { "click": { "type": "string" } } },
+                { "required": ["setInputFiles"], "properties": { "setInputFiles": { "type": "array", "minItems": 2, "items": { "type": "string" } } } },
+                { "required": ["waitForSelector"], "properties": { "waitForSelector": { "type": "string" }, "timeout": { "type": "integer" } } },
+                { "required": ["expect"], "properties": { "expect": { "type": "object" } } },
+                { "required": ["fetch"], "properties": { "fetch": { "type": "string" }, "expectStatus": { "type": "integer" } } },
+                { "required": ["expectNoConsoleError"], "properties": { "expectNoConsoleError": { "type": "boolean" } } },
+                { "required": ["expectNoNetworkFailure"], "properties": { "expectNoNetworkFailure": { "type": "array", "items": { "type": "string" } } } }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "_meta": {
+      "type": "object",
+      "required": ["generated_by", "generated_at", "source_intent_hash"],
+      "properties": {
+        "generated_by": { "type": "string" },
+        "generated_at": { "type": "string", "format": "date-time" },
+        "source_intent_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  }
+}

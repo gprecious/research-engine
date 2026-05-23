@@ -1,0 +1,9 @@
+{
+  "name": "app-sample",
+  "private": true,
+  "scripts": {
+    "build": "echo 'mock build'",
+    "start": "node -e \"require('http').createServer((q,r)=>{r.writeHead(200);r.end('ok')}).listen(3000)\""
+  },
+  "engines": { "node": "22" }
+}

@@ -1,0 +1,14 @@
+{
+  "slug": "2026-05-23-test-fixture",
+  "baseUrl": { "local": "http://localhost:3000", "prod": "https://example.ts.net" },
+  "scenarios": [
+    { "name": "landing", "steps": [{ "goto": "/" }, { "expect": { "selector": "h1" } }, { "expectNoConsoleError": true }] },
+    { "name": "second-flow", "steps": [{ "goto": "/about" }, { "expectNoConsoleError": true }] },
+    { "name": "health", "steps": [{ "fetch": "/health", "expectStatus": 200 }] }
+  ],
+  "_meta": {
+    "generated_by": "spec-author@abc1234",
+    "generated_at": "2026-05-23T10:00:00.000Z",
+    "source_intent_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

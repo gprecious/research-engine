@@ -6,7 +6,8 @@
     "test": "vitest run",
     "test:unit": "vitest run tests/research-design/lib tests/research-design/schemas",
     "test:e2e": "playwright test --config tests/research-design/e2e/playwright.config.ts",
-    "test:bats": "bats tests/research-design/pipeline.test.sh"
+    "test:bats": "bats tests/research-engine/spec.test.sh tests/research-engine/design.test.sh tests/research-engine/deploy.test.sh",
+    "test:e2e:re": "playwright test --config tests/research-engine/e2e/playwright.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.45.0",

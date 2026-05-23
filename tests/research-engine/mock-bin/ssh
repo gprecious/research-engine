@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Mock ssh — emits canned responses for /deploy tests
+case "$*" in
+  *"pct list"*) echo "100 stopped rd-mock";;
+  *"pvesh get /cluster/nextid"*) echo "101";;
+  *"tailscale status"*) echo "mock-tailnet-1.2.3.4 mock-host idle";;
+  *) echo "[mock-ssh] cmd: $*" >&2;;
+esac
+exit 0
