@@ -11,6 +11,7 @@
     "baseUrl": {
       "type": "object",
       "required": ["local"],
+      "additionalProperties": false,
       "properties": {
         "local": { "type": "string", "format": "uri" },
         "prod": { "type": "string", "format": "uri" }
