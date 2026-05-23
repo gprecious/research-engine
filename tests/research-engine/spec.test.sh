@@ -2,7 +2,6 @@
 
 setup() {
   export PATH="$(pwd)/tests/research-engine/mock-bin:$PATH"
-  export RESEARCH_ENGINE_SPEC_MOCK=1
   SLUG="2026-05-23-spec-test-fixture"
   TARGET="research/${SLUG}"
   mkdir -p "${TARGET}"
