@@ -1,0 +1,6 @@
+{
+  "captured_at": "2026-05-23T10:00:00.000Z",
+  "source_url": "https://claude.ai/design/fixture",
+  "pages": [{ "name": "landing", "html": "index.html", "assets": [] }],
+  "design_system": { "tokens": {}, "components": [] }
+}
