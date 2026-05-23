@@ -5,6 +5,29 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
 ## [Unreleased]
 
+## [0.12.0]
+
+### Added
+- `/spec <slug>` — README + intent → `spec/scenarios.json` (TDD e2e 계약) + `spec/spec.md`. G0 게이트 (ajv strict schema + scenarios ≥ 3).
+- `/design <slug>` — claude.ai/design 핸드오프만. 기존 handoff cache mode (재실행 시 skip).
+- `/deploy <slug>` — `app/` (사용자가 외부 툴로 build) → hetzner LXC. G3 게이트 (prod URL e2e + /health 200).
+- `agents/spec-author.md`, `agents/deploy-planner.md` — 신규 LLM persona.
+- `lib/scenarios_validator.mjs` + ajv strict 검증 (`_meta.source_intent_hash` cascade hint).
+- `tests/research-engine/` — 13 bats + e2e infra (env-driven runner).
+- `scripts/deploy_lxc.sh` 가 deploy-planner 의 `lxc_config.json` 소비 (cores/memory/disk/systemd-unit override 가능).
+
+### Removed (breaking)
+- `/research-design <slug>` — 통합 파이프라인 제거. `/spec` + `/design` + 사용자 수동 build + `/deploy` 로 분리.
+- `scripts/research_design_pipeline.sh`, `tests/research-design/pipeline.test.sh`.
+
+### Changed
+- `scripts/lxc_deploy.sh` → `scripts/deploy_lxc.sh` (rename + lxc_config.json 인자 추가, systemd unit 이름 통일 `research-engine-app.service`).
+
+### Out of scope (의도적 미포함)
+- `/build` 자동화 — 사용자가 외부 툴 (v0, cursor 등) 로 직접 build.
+- `/ship` orchestrator — `/build` 도입 시 같이 설계.
+- G3 실패 시 자동 롤백 — LXC slug-idempotent 특성상 별도 설계 필요. v1 은 `deploy.json.prev_host` 보존만.
+
 ## [0.11.0]
 
 ### Added
