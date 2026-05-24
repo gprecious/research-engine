@@ -8,13 +8,18 @@
 # aggregation, and report rendering.
 #
 # Flags:
-#   --check        Run preflight checks only and exit
-#   --judge        Run judge.py for every populated topic dir under bench/runs/<date>
-#   --report       Aggregate judge.json files into results.json and render report.md
-#   --all          Equivalent to --judge then --report
-#   --topic <id>   Restrict judge/report to one topic
-#   --force        Re-run judge even when judge.json exists
-#   --judge-model  Default: claude-sonnet-4-6
+#   --check                  Run preflight checks only and exit
+#   --judge                  Run judge.py for every populated topic dir under bench/runs/<date>
+#   --report                 Aggregate judge.json files into results.json and render report.md
+#   --all                    Equivalent to --judge then --report
+#   --topic <id>             Restrict judge/report to one topic
+#   --force                  Re-run judge even when judge.json exists
+#   --judge-model            Default: claude-sonnet-4-6
+#   --swap-candidates <s>    Swap agents/<name>.md with candidate path. <s> is space-separated
+#                            "name:path" pairs. Backs up originals to .bench-restore/<name>.md
+#                            and writes a manifest to .bench-restore/_specs.txt. Refuses if a
+#                            previous swap was not restored.
+#   --restore-candidates     Restore agent files from .bench-restore/. Idempotent.
 #
 # NOTE on --judge: this dispatches judge.py which shells out to `claude -p`.
 # That subprocess hits subscription rate limits independently from the parent
@@ -30,12 +35,16 @@ TOPICS="$REPO_ROOT/bench/topics.yaml"
 DATE="$(date -u +%Y-%m-%d)"
 RUNS_DIR="$REPO_ROOT/bench/runs/$DATE"
 
+RESTORE_DIR="$REPO_ROOT/.bench-restore"
+
 JUDGE_MODEL="claude-sonnet-4-6"
 ONLY_TOPIC=""
 FORCE=0
 DO_CHECK=0
 DO_JUDGE=0
 DO_REPORT=0
+SWAP_SPECS=""
+DO_RESTORE=0
 
 usage() { sed -n '2,/^set/p' "$0" | sed 's/^# \{0,1\}//;s/^set.*//' | head -20; }
 
@@ -98,6 +107,51 @@ judge_all() {
     python3 "$ROOT/judge.py" --topic-dir "$td" --topic-id "$topic_id" --judge-model "$JUDGE_MODEL" \
       || echo "  [judge $topic_id] FAILED — continuing"
   done
+}
+
+candidates_swap() {
+  if [[ -e "$RESTORE_DIR/_specs.txt" ]]; then
+    echo "✗ $RESTORE_DIR/_specs.txt exists — previous swap not restored. Run --restore-candidates first." >&2
+    return 1
+  fi
+  mkdir -p "$RESTORE_DIR"
+  : > "$RESTORE_DIR/_specs.txt"
+  for spec in $SWAP_SPECS; do
+    local name="${spec%%:*}"
+    local path="${spec#*:}"
+    local agent_file="$REPO_ROOT/agents/${name}.md"
+    if [[ ! -f "$agent_file" ]]; then
+      echo "✗ agent file missing: $agent_file" >&2
+      candidates_restore || true
+      return 1
+    fi
+    if [[ ! -f "$path" ]]; then
+      echo "✗ candidate path missing: $path" >&2
+      candidates_restore || true
+      return 1
+    fi
+    cp "$agent_file" "$RESTORE_DIR/${name}.md"
+    cp "$path" "$agent_file"
+    echo "$spec" >> "$RESTORE_DIR/_specs.txt"
+    echo "✓ swapped agents/${name}.md ← $path"
+  done
+}
+
+candidates_restore() {
+  if [[ ! -d "$RESTORE_DIR" ]]; then
+    echo "no $RESTORE_DIR — nothing to restore"
+    return 0
+  fi
+  shopt -s nullglob
+  for backup in "$RESTORE_DIR"/*.md; do
+    local fname; fname=$(basename "$backup")
+    local name="${fname%.md}"
+    mv "$backup" "$REPO_ROOT/agents/${name}.md"
+    echo "✓ restored agents/${name}.md"
+  done
+  shopt -u nullglob
+  rm -f "$RESTORE_DIR/_specs.txt"
+  rmdir "$RESTORE_DIR" 2>/dev/null || true
 }
 
 aggregate_and_report() {
@@ -169,17 +223,21 @@ while (( $# > 0 )); do
     --topic) ONLY_TOPIC="$2"; shift 2 ;;
     --force) FORCE=1; shift ;;
     --judge-model) JUDGE_MODEL="$2"; shift 2 ;;
+    --swap-candidates) SWAP_SPECS="$2"; shift 2 ;;
+    --restore-candidates) DO_RESTORE=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown arg: $1" >&2; usage; exit 2 ;;
   esac
 done
 
-if (( ! DO_CHECK && ! DO_JUDGE && ! DO_REPORT )); then
-  echo "no stage selected — pass --check, --judge, --report, or --all" >&2
+if (( ! DO_CHECK && ! DO_JUDGE && ! DO_REPORT && ! DO_RESTORE )) && [[ -z "$SWAP_SPECS" ]]; then
+  echo "no stage selected — pass --check, --judge, --report, --all, --swap-candidates, or --restore-candidates" >&2
   echo "(run matrix is orchestrated by /bench slash command, not this script)" >&2
   exit 2
 fi
 
 if (( DO_CHECK )); then preflight || exit $?; fi
+if [[ -n "$SWAP_SPECS" ]]; then candidates_swap || exit $?; fi
 if (( DO_JUDGE )); then judge_all; fi
 if (( DO_REPORT )); then aggregate_and_report; fi
+if (( DO_RESTORE )); then candidates_restore; fi

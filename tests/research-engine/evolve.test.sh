@@ -50,6 +50,19 @@ JSON
   test -f "$WORK/research/_index/evolve-ledger.json"
 }
 
+@test "decide atomic write leaves no .tmp.* leftover" {
+  cat > "$WORK/cur.json" <<'JSON'
+{"scores":[0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5]}
+JSON
+  cat > "$WORK/cand.json" <<'JSON'
+{"scores":[0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6],"source_count":10,"type_diversity":3,"latency_inv":0.01}
+JSON
+  cd "$WORK"
+  bash scripts/evolve_run.sh decide foo cur.json cand.json >/dev/null
+  test -f "$WORK/research/_index/evolve-ledger.json"
+  ! ls "$WORK/research/_index/" | grep -E '\.tmp\.[0-9]+$'
+}
+
 @test "decide hold case does not mutate ledger" {
   cat > "$WORK/cur.json" <<'JSON'
 {"scores": [0.50, 0.55, 0.45, 0.60, 0.40, 0.50, 0.55, 0.45]}

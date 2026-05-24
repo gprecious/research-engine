@@ -80,19 +80,19 @@ Filter by `--topic` if set. For each `topic_id`:
 
       ### Candidate swap (when `--candidates` is provided)
 
-      When one or more `--candidates <name>:<path>` flags are given, before executing the RE matrix for each affected adapter, the runner MUST swap `agents/<name>.md` with the candidate file, run the matrix, then restore the original. Restoration MUST happen even on failure.
+      When one or more `--candidates <name>:<path>` 플래그가 주어지면, RE 매트릭스 실행 전에 `agents/<name>.md` 를 후보 파일로 교체하고, 매트릭스 종료 후 원본을 복원한다. 복원은 실패 시에도 반드시 수행.
 
-      의사코드:
+      이 슬래시는 다음 두 호출로 구현한다:
+
       ```bash
-      for spec in $CANDIDATES; do
-        name=${spec%%:*}; path=${spec#*:}
-        cp "agents/${name}.md" "/tmp/bench-restore-${name}.md"
-        cp "$path" "agents/${name}.md"
-      done
-      trap 'for spec in $CANDIDATES; do name=${spec%%:*}; mv "/tmp/bench-restore-${name}.md" "agents/${name}.md"; done' EXIT
+      # Stage 2 시작 전 (한 번)
+      bash "${CLAUDE_PLUGIN_ROOT}/bench/run.sh" --swap-candidates "<spec1> <spec2> ..."
+
+      # Stage 2/3/4 모두 끝난 직후 (Stage 5 직전), 그리고 슬래시 중단/에러 발생 시에도
+      bash "${CLAUDE_PLUGIN_ROOT}/bench/run.sh" --restore-candidates
       ```
 
-      실제 코드는 `bench/run.sh` 의 RE 분기에서 evolved candidate path 가 인자로 들어오면 동일 swap/restore 를 구현. 구현 위치는 `bench/run.sh` 내 RE mode 분기 (현재 파일에는 preflight/judge/report 단계만 존재하며, 실제 RE 매트릭스 실행은 이 명세를 따라 추후 구현).
+      `--swap-candidates` 는 `<repo>/.bench-restore/<name>.md` 에 원본을 백업하고 `_specs.txt` 매니페스트를 남긴다. 이전 swap 이 복원되지 않은 채 남아 있으면 `--swap-candidates` 는 거부한다 (먼저 `--restore-candidates` 실행). `--restore-candidates` 는 idempotent.
 
       - **RE mode** — three steps, no others. Subagents have repeatedly skipped the post-Skill bookkeeping when the steps were spread across multiple bash blocks; the helper script collapses tail-bookkeeping into one call.
         1. Snapshot:
