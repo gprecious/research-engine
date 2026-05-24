@@ -91,3 +91,20 @@ teardown() {
   [ "$status" -eq 0 ]
   ! echo "$output" | jq -r '.similar_sessions[].slug' | grep -q "2026-05-03-fixture-c"
 }
+
+@test "ledger --rebuild: suggestion_shown_at가 같은 dream 사이클에서 보존된다" {
+  cd "${TMP_HOME}"
+  bash "${REPO_ROOT}/scripts/memory_reindex.sh"
+  # manually set suggestion_shown_at
+  jq '.suggestion_shown_at="2026-06-01T00:00:00+09:00" | .last_shown_count=3' \
+    "${TMP_HOME}/research/_index/dream-ledger.json" > /tmp/_ledger_patched.json
+  mv /tmp/_ledger_patched.json "${TMP_HOME}/research/_index/dream-ledger.json"
+
+  # rebuild without adding a new dream
+  bash "${REPO_ROOT}/scripts/memory_reindex.sh"
+
+  shown_at=$(jq -r '.suggestion_shown_at' "${TMP_HOME}/research/_index/dream-ledger.json")
+  shown_count=$(jq -r '.last_shown_count' "${TMP_HOME}/research/_index/dream-ledger.json")
+  [ "$shown_at" = "2026-06-01T00:00:00+09:00" ]
+  [ "$shown_count" = "3" ]
+}
