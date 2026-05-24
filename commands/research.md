@@ -147,6 +147,30 @@ Timeout per adapter: 5 minutes (configured implicitly by the agent runtime; do N
 5. For each unique `related[]` entry, write `<report_dir>/related/<kind>-<slug>.md` with a one-paragraph summary + URL. Deduplicate by URL.
 6. If any adapter had non-empty `failures[]`, include the `## 수집 실패 (Failures)` section in README.md.
 7. **Push to Notion (mirror)** — if `NOTION_TOKEN` + `NOTION_PARENT_PAGE_ID` are set (env or `~/.config/research-engine/notion.env`), run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/push_to_notion.sh" "<report_dir>"`. The script ensures a `research-engine` database exists under the parent page and upserts a **single row per session** (matched by `Slug`). The row's properties capture metadata (Title / Slug / Input URL / Input Type / Created / Purpose / Audience / Sources); the row's page body is a single consolidated report — `README.md` at the top, then one toggle each for Transcript / Followups / Related materials. Capture the returned Notion URL and add it to `sources.json` at `output_notion_url`. Prepend a `> 📒 Notion: <url>` line under the frontmatter of local `README.md`. If the env is not configured, skip silently (log one line).
+
+**Step 7.5 — Update dream-ledger + suggestion check**
+
+After step 7 (Notion push), call reindex once so the new session is reflected:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/memory_reindex.sh"
+```
+
+This rebuilds `research/_index/manifest.json` and refreshes `dream-ledger.json` (`sessions_since_last_dream` is recomputed from manifest vs `last_dream_at`).
+
+Then check whether to suggest `/dream`:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/lib/memory/ledger.mjs" --suggest? \
+  --ledger "research/_index/dream-ledger.json"
+# exit 0 + {"should":true,"count":N}  → 제안 줄을 step 8 final message에 포함
+# exit 1 + {"should":false,...}        → 제안 생략
+```
+
+If suggest = true, the `--suggest?` CLI also writes `suggestion_shown_at` back to the ledger automatically (so the same threshold isn't nagged repeatedly until the next threshold is crossed). Include exactly this line in step 8's final message:
+
+> 💡 dream-ledger: 마지막 dream 이후 {N}개 세션이 누적되었습니다. `/dream` 으로 패턴 인사이트를 추출할 수 있어요.
+
 8. Final message to user: one line with `<report_dir>/README.md` path + Notion URL (if pushed) + a 2-line TL;DR preview.
 
 ## Cache policy
