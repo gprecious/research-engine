@@ -25,6 +25,7 @@ Non-runtime stages (preflight, judge, aggregation, report) are handled by `bench
 - `--judge-only` — skip Stages 2-3, run Stage 4-5
 - `--report-only` — skip Stages 2-4, render report only
 - `--judge-model <m>` — judge model (default `claude-sonnet-4-6`)
+- `--candidates <name>:<path>` — repeatable. 어댑터 `<name>` 의 페르소나를 일시적으로 `<path>` 로 swap 한 채 RE 매트릭스 실행. 결과는 별도 `runs/<date>/candidates/<name>-<basename>/` 에 저장.
 
 ## Constants
 
@@ -76,6 +77,22 @@ Filter by `--topic` if set. For each `topic_id`:
       `mkdir -p ${run_dir}`. Capture `start = $(date +%s)`.
 
       **Mode-specific execution**:
+
+      ### Candidate swap (when `--candidates` is provided)
+
+      When one or more `--candidates <name>:<path>` flags are given, before executing the RE matrix for each affected adapter, the runner MUST swap `agents/<name>.md` with the candidate file, run the matrix, then restore the original. Restoration MUST happen even on failure.
+
+      의사코드:
+      ```bash
+      for spec in $CANDIDATES; do
+        name=${spec%%:*}; path=${spec#*:}
+        cp "agents/${name}.md" "/tmp/bench-restore-${name}.md"
+        cp "$path" "agents/${name}.md"
+      done
+      trap 'for spec in $CANDIDATES; do name=${spec%%:*}; mv "/tmp/bench-restore-${name}.md" "agents/${name}.md"; done' EXIT
+      ```
+
+      실제 코드는 `bench/run.sh` 의 RE 분기에서 evolved candidate path 가 인자로 들어오면 동일 swap/restore 를 구현. 구현 위치는 `bench/run.sh` 내 RE mode 분기 (현재 파일에는 preflight/judge/report 단계만 존재하며, 실제 RE 매트릭스 실행은 이 명세를 따라 추후 구현).
 
       - **RE mode** — three steps, no others. Subagents have repeatedly skipped the post-Skill bookkeeping when the steps were spread across multiple bash blocks; the helper script collapses tail-bookkeeping into one call.
         1. Snapshot:
