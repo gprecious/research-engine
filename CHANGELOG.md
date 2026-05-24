@@ -5,6 +5,44 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
 ## [Unreleased]
 
+## [0.13.0]
+
+Cross-session learning layer. `/research` 가 과거 유사 세션과 dream 인사이트를 자동으로 어댑터 dispatch 에 주입하고, 5회 누적 시 `/dream` 호출을 제안. `/dream` 슬래시는 N개 세션에서 반복 패턴·어댑터 실패·자주 묻는 의도·prior art 군집을 추출해 `docs/dreams/<run-id>/` 에 readonly 인사이트로 축적.
+
+### Added
+- `lib/memory/` — Node ESM 유틸 (vitest 34 tests)
+  - `tokenize.mjs` — 한·영 NFC 토크나이저
+  - `similarity.mjs` — `input_type/topics/purpose_tokens` 가중합 매처 (W_TYPE=3, W_TOPIC=2, W_PURPOSE=1) + topK
+  - `manifest_schema.mjs` — 파일시스템 → manifest entry 빌더 + `--build` CLI. **Self-healing**: README 존재 시 항상 sha256 재해시 → sources.json 의 stale hash 자동 갱신.
+  - `ledger.mjs` — dream-suggestion 카운터 상태기계 + `--rebuild/--bump/--reset/--suggest?` CLI. `--rebuild` 가 same-dream-cycle 동안 `suggestion_shown_at` 보존 (anti-nag).
+  - `query_cli.mjs` — manifest 읽고 topK + active dreams JSON shell wrapper.
+- `scripts/memory_reindex.sh` — manifest + ledger atomic rebuild (idempotent, mtime invariant).
+- `scripts/memory_query.sh` — fail-soft top-K prior + active dream insights. 모든 에러 경로에서 empty JSON + exit 0.
+- `scripts/dream_run.sh` — `/dream` 오케스트레이터. `--resolve-only/--mint-only/--finalize` 3 모드, 모든 finalize 쓰기 tmp+mv 원자화.
+- `commands/dream.md` — `/dream` 슬래시 시퀀스 (D1–D8) + 실패 처리.
+- `agents/dream-extractor.md` — dream agent persona (4-category JSON contract: adapter_failure_modes / recurring_intents / prior_art_clusters / topic_coverage_gaps).
+- `tests/research-engine/` — bats 23개 추가 (memory, dream, research-with-memory, dream-e2e, research-followup-occ) + 5 fixture 세트.
+
+### Changed
+- `commands/research.md` — 4 Stage hook 추가:
+  - **Stage 2.5** Memory Query — preview 직후 `memory_query.sh` 호출, 결과를 `<report_dir>/cache/memory.json` 에 기록.
+  - **Stage 4** dispatch — adapter 입력에 `prior_knowledge` 필드 + citation 요건 (재사용 시 slug/run_id 인용 필수).
+  - **Stage 5.2** sources.json — `content_sha256` (README 해시) + `created_by` (actor 배열) 필수. Notion push 후 README 변경 시 sha256 재계산 의무.
+  - **Stage 5.8** ledger 업데이트 + 제안 — Notion push 후 `memory_reindex.sh` → `ledger --suggest?` → 5회 누적 시 final message 에 `/dream` 제안 라인 포함.
+- `commands/research-followup.md` — `session.md` write 직전 sha256 OCC precondition + 1회 자동 재시도 + atomic rename.
+- `commands/bench.md` — report.md 작성 후 dream-ledger 비교, `last_dream_at < bench.started_at` 시 final message 에 `/dream --bench=<id>` 제안 (자동 트리거 없음).
+- `package.json` — `test:bats` 가 새 bats 5개 포함.
+
+### Test coverage
+- bats: 36/36 (legacy 13 + memory 9 + dream 4 + research-with-memory 4 + dream-e2e 3 + research-followup-occ 3)
+- vitest: 34/34 (tokenize 6 + similarity 10 + manifest_schema 6 + ledger 12)
+- Real-repo verify: 87 기존 세션 manifest 인식, mtime invariant, similarity top-match 정확.
+
+### Out of scope (의도적 미포함)
+- Dream agent 의 자동 트리거 — 사용자가 `/dream` 명시 호출해야 함. 5회 누적 시 *제안*만 노출.
+- Bench 결과의 자동 dream 입력 — `--bench=<id>` 옵션은 사용자가 명시.
+- Legacy 80여 세션 backfill — derived 모드로 manifest 가 자동 인덱싱, 원본 파일 미변경.
+
 ## [0.12.1]
 
 ### Changed
