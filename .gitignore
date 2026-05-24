@@ -33,3 +33,7 @@ research/*/design/handoff/
 research/*/design/app/
 # allow hand-authored contract files
 !research/*/design/scenarios.json
+
+# Evolve loop: commit ledger, ignore ephemeral candidates
+!research/_index/evolve-ledger.json
+agents/*.candidate.md
