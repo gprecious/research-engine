@@ -41,6 +41,34 @@ For (B) and (C), dispatch 1–2 adapter subagents (same contract as `/research` 
 
 Compose the answer in Korean. Cite existing sources by their `[n]` number from `sources.json`. If new sources were fetched, append them to `sources.json` (continue numbering), write any new `related/*.md` files, and cite with the new `[n]`.
 
+## OCC precondition (concurrent write protection)
+
+Before appending to `research/<slug>/session.md`:
+
+1. Compute expected hash:
+   ```bash
+   expected_hash=$(sha256sum research/<slug>/session.md | awk '{print $1}')
+   ```
+
+2. Generate new content (may take seconds while LLM thinks).
+
+3. Just before writing, recompute:
+   ```bash
+   actual_hash=$(sha256sum research/<slug>/session.md | awk '{print $1}')
+   ```
+
+4. If `expected_hash != actual_hash`:
+   - Re-read current session.md, regenerate the new content using current state as context (1 auto-retry).
+   - On second mismatch: STOP and tell the user "concurrent edit detected on `<slug>/session.md` — please re-run /research-followup after resolving the conflict manually."
+
+5. Atomic write:
+   ```bash
+   cat session.md new_content > session.md.tmp
+   mv session.md.tmp session.md
+   ```
+
+This OCC protects against multi-pane (`cmux:cmux-orchestrator`) scenarios where two `/research-followup` calls could race on the same session.
+
 ## Append to session.md
 
 Append (append-only, never rewrite prior entries):
