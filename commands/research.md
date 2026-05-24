@@ -95,13 +95,15 @@ Apply `superpowers:dispatching-parallel-agents`. Build a work plan:
   - If preview links HN/Reddit threads → community-adapter (pass `thread_urls`)
   - For topic mode → all tier-1 + community-adapter with `topic_query`.
 
-Dispatch each adapter with a single Agent call, parallel (issue all Agent tool calls in one assistant message). Per-adapter prompt template:
+Dispatch each adapter with a single Agent call, parallel (issue all Agent tool calls in one assistant message). Before dispatching, dispatcher reads <report_dir>/cache/memory.json once and includes the same JSON as the `prior_knowledge` field in every adapter's input. Per-adapter prompt template:
 
 ```
 You are dispatched as the <adapter-name> subagent for research session <slug>.
 
 Inputs:
-  <JSON of {url|targets|libraries|thread_urls, intent, cache_dir, slug, fresh}>
+  <JSON of {url|targets|libraries|thread_urls, intent, cache_dir, slug, fresh, prior_knowledge}>
+
+prior_knowledge (when non-empty) contains the contents of <report_dir>/cache/memory.json — similar past sessions and active dream insights from the research-engine memory layer. Treat it as HINTS only, not verified facts. If you reuse a finding from prior_knowledge, you MUST cite the prior session/dream via its slug or run_id in your `findings[].sources[]` or in a `failures[]` note. Do not blindly copy prior findings — fresh sources still take priority. If prior_knowledge is empty `{similar_sessions:[],dream_insights:[]}`, proceed normally.
 
 Return a single fenced JSON block per lib/adapter_contract.md. Do not include anything after the JSON block.
 ```
