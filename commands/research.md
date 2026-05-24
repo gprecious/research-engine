@@ -127,6 +127,14 @@ Timeout per adapter: 5 minutes (configured implicitly by the agent runtime; do N
      "created": "<ISO>"
    }
    ```
+
+   **Required NEW fields** (research-engine v0.13+):
+
+   - `content_sha256`: After writing `<report_dir>/README.md` in step 3, compute its sha256 with `sha256sum <report_dir>/README.md | awk '{print $1}'` and patch it into `sources.json`. Order: write README.md → hash it → patch sources.json. README.md is the *content fingerprint authority*.
+   - `created_by`: Array of actors. For each adapter that contributed (Stage 4 dispatch), add `{actor_type: "adapter", id: "<adapter-name>", model: "<model-id-or-unknown>", ts: "<adapter-completion-ISO8601>"}`. Order: list adapters in the order they returned.
+
+   After step 7 (Notion push) prepends the `> 📒 Notion:` line to README.md, **recompute the sha256 and patch `sources.json.content_sha256`** so it always matches README.md byte-for-byte.
+
 3. Write `<report_dir>/README.md` using the templates in `lib/report_sections.md`. Merge findings by topic, not by adapter. Dedupe near-duplicate findings. Preserve `[n]` markers.
 
    **Dedupe is input-type-aware:**
