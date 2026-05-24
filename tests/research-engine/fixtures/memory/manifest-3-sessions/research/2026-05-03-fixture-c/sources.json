@@ -1,0 +1,9 @@
+{
+  "input": "https://youtu.be/fixture-c",
+  "input_type": "youtube",
+  "intent": { "purpose": "에이전트 메모리 영상 정리", "focus": "memory dreaming", "audience_level": "엔지니어" },
+  "created": "2026-05-03T10:00:00+09:00",
+  "content_sha256": "fixture-hash-c",
+  "created_by": [{ "actor_type": "adapter", "id": "youtube-adapter", "model": "claude-opus-4-7", "ts": "2026-05-03T10:00:00+09:00" }],
+  "sources": [{ "n": 1, "adapter": "youtube", "type": "youtube-captions", "url": "https://youtu.be/fixture-c", "title": "Fixture C" }]
+}
