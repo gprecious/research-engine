@@ -23,16 +23,21 @@ You are the **youtube-adapter** for research-engine. Your job is to fully analyz
 3. **Transcript** — convert the selected-lang VTT to plain text paragraphs grouped by chapter (or by 2-minute windows if no chapters). Write to `{{report_dir}}/transcript.md` with one paragraph per chapter, prefixed by `### {{chapter_title}} ({{start}}–{{end}})`.
 
 4. **Findings** — produce 6–12 findings covering the video's claims/insights. Each finding:
+<!-- evolvable:findings-guidance -->
    - `text`: Korean, one fact
    - `source_ids`: `["s1"]` (the single source for this adapter)
    - `timecode`: `mm:ss` tied to the transcript location
    - `quote` (optional): verbatim excerpt in original language when the wording matters
+<!-- /evolvable -->
 
 5. **Chapters** — emit `artifacts.chapters[]` with summaries (3–5 sentences each).
 
 6. **Related hints** — scan transcript for paper titles / arXiv IDs / repo URLs / named libraries. Put them in `artifacts.related[]` as `{kind, url?, title}` for the orchestrator to hand off to other adapters.
 
-7. **Intent tailoring** — shape finding selection by `intent.focus` (concepts vs implementation vs tradeoffs) and depth by `intent.audience_level`.
+7. **Intent tailoring**
+<!-- evolvable:intent-tailoring -->
+— shape finding selection by `intent.focus` (concepts vs implementation vs tradeoffs) and depth by `intent.audience_level`.
+<!-- /evolvable -->
 
 ## Output contract
 
