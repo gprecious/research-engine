@@ -177,6 +177,22 @@ Print one final line:
 
 Do not summarize or post-process the report. The user inspects it directly.
 
+### Dream suggestion (after report.md is written)
+
+If `research/_index/dream-ledger.json` exists and `last_dream_at < bench.started_at`, append this line to the final user message:
+
+```bash
+if [ -f "research/_index/dream-ledger.json" ]; then
+  last_dream=$(jq -r '.last_dream_at // ""' research/_index/dream-ledger.json)
+  bench_started=$(jq -r '.started_at // ""' "bench/runs/${BENCH_RUN_ID}/meta.json" 2>/dev/null || echo "")
+  if [ -z "${last_dream}" ] || [ "${last_dream}" \< "${bench_started}" ]; then
+    echo "💡 새 bench 결과: /dream --bench=${BENCH_RUN_ID} 로 어댑터 약점을 인사이트로 전환할 수 있어요."
+  fi
+fi
+```
+
+자동 트리거는 *하지 않는다* — 사용자가 명시 호출해야 함.
+
 ## Failure handling
 
 Per spec §6: any single run failure must NOT abort the matrix. If a Skill or Agent invocation throws, write the failure to `${run_dir}/meta.json` with `status: "failed"` and continue to the next iteration. Surface failures in the per-run echo line (e.g., `[<id>/<mode>/run<n>] FAILED — continuing`). Stages 4–5 still run on whatever completed.
