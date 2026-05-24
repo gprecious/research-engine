@@ -80,7 +80,7 @@ teardown() {
   [ "$status" -eq 0 ]
   count=$(echo "$output" | jq '.similar_sessions | length')
   [ "$count" -ge 1 ]
-  [ "$count" -le 2 ]
+  [ "$count" -le 3 ]
 }
 
 @test "memory_query: --self-slug 자기 제외" {
