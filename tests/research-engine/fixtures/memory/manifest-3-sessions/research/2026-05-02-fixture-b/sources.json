@@ -1,0 +1,9 @@
+{
+  "input": "https://arxiv.org/abs/fixture-b",
+  "input_type": "arxiv",
+  "intent": { "purpose": "에이전트 메모리 논문 정리", "focus": "MemGPT", "audience_level": "엔지니어" },
+  "created": "2026-05-02T10:00:00+09:00",
+  "content_sha256": "fixture-hash-b",
+  "created_by": [{ "actor_type": "adapter", "id": "arxiv-adapter", "model": "claude-opus-4-7", "ts": "2026-05-02T10:00:00+09:00" }],
+  "sources": [{ "n": 1, "adapter": "arxiv", "type": "arxiv-paper", "url": "https://arxiv.org/abs/fixture-b", "title": "Fixture B" }]
+}

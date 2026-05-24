@@ -1,0 +1,9 @@
+{
+  "input": "https://arxiv.org/abs/2304.03442",
+  "input_type": "arxiv",
+  "intent": { "purpose": "에이전트 메모리 prior art", "focus": "Generative Agents", "audience_level": "엔지니어" },
+  "created": "2026-05-12T10:00:00+09:00",
+  "content_sha256": "dream-input-hash-c",
+  "created_by": [{ "actor_type": "adapter", "id": "arxiv-adapter", "model": "claude-opus-4-7", "ts": "2026-05-12T10:00:00+09:00" }],
+  "sources": [{ "n": 1, "adapter": "arxiv", "type": "arxiv-paper", "url": "https://arxiv.org/abs/2304.03442", "title": "Generative Agents" }]
+}

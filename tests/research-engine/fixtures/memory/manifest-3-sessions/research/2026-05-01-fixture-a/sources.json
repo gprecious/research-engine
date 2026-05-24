@@ -1,0 +1,9 @@
+{
+  "input": "https://youtu.be/fixture-a",
+  "input_type": "youtube",
+  "intent": { "purpose": "youtube 캡션 패턴 학습", "focus": "yt-dlp", "audience_level": "엔지니어" },
+  "created": "2026-05-01T10:00:00+09:00",
+  "content_sha256": "fixture-hash-a",
+  "created_by": [{ "actor_type": "adapter", "id": "youtube-adapter", "model": "claude-opus-4-7", "ts": "2026-05-01T10:00:00+09:00" }],
+  "sources": [{ "n": 1, "adapter": "youtube", "type": "youtube-captions", "url": "https://youtu.be/fixture-a", "title": "Fixture A" }]
+}

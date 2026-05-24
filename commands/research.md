@@ -39,6 +39,30 @@ Branch by `input_type`:
 
 Write the preview to `RESEARCH_DIR/<tmp-slug>/cache/preview-<cache_key>.json` (create dir if needed). Compute `cache_key` via `bash "${CLAUDE_PLUGIN_ROOT}/scripts/cache_key.sh" "<target>"`.
 
+### Stage 2.5 — Memory Query (prior_knowledge 자동 조회)
+
+After preview JSON is written, query memory for similar past sessions before moving to Stage 3:
+
+```bash
+# Build a target descriptor from preview-level info
+TARGET_JSON=$(jq -nc \
+  --arg t "<input_type>" \
+  --arg p "<intent.purpose 후보 (preview title/description에서 추출, 또는 빈 문자열)>" \
+  --arg sl "<slug 잠정>" \
+  --argjson topics '[]' \
+  '{input_type: $t, topics: $topics, intent: {purpose: $p}, slug: $sl}')
+
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/memory_query.sh" \
+  --target-json "${TARGET_JSON}" \
+  --top-k 5 \
+  --self-slug "<slug>" \
+  > "<report_dir>/cache/memory.json"
+```
+
+The query runs BEFORE Stage 3 Intent Q&A. At this point you only have preview-level info — that's enough for similarity matching. The result `cache/memory.json` is consumed in Stage 4 dispatch as `prior_knowledge`.
+
+If `cache/memory.json` is `{"similar_sessions":[],"dream_insights":[]}` (no priors), proceed normally — memory is optional and silently absent on first runs.
+
 ### Stage 3 — Intent Q&A
 
 Compute `slug`:
@@ -71,13 +95,15 @@ Apply `superpowers:dispatching-parallel-agents`. Build a work plan:
   - If preview links HN/Reddit threads → community-adapter (pass `thread_urls`)
   - For topic mode → all tier-1 + community-adapter with `topic_query`.
 
-Dispatch each adapter with a single Agent call, parallel (issue all Agent tool calls in one assistant message). Per-adapter prompt template:
+Dispatch each adapter with a single Agent call, parallel (issue all Agent tool calls in one assistant message). Before dispatching, dispatcher reads <report_dir>/cache/memory.json once and includes the same JSON as the `prior_knowledge` field in every adapter's input. Per-adapter prompt template:
 
 ```
 You are dispatched as the <adapter-name> subagent for research session <slug>.
 
 Inputs:
-  <JSON of {url|targets|libraries|thread_urls, intent, cache_dir, slug, fresh}>
+  <JSON of {url|targets|libraries|thread_urls, intent, cache_dir, slug, fresh, prior_knowledge}>
+
+prior_knowledge (when non-empty) contains the contents of <report_dir>/cache/memory.json — similar past sessions and active dream insights from the research-engine memory layer. Treat it as HINTS only, not verified facts. If you reuse a finding from prior_knowledge, you MUST cite the prior session/dream via its slug or run_id in your `findings[].sources[]` or in a `failures[]` note. Do not blindly copy prior findings — fresh sources still take priority. If prior_knowledge is empty `{similar_sessions:[],dream_insights:[]}`, proceed normally.
 
 Return a single fenced JSON block per lib/adapter_contract.md. Do not include anything after the JSON block.
 ```
@@ -103,6 +129,14 @@ Timeout per adapter: 5 minutes (configured implicitly by the agent runtime; do N
      "created": "<ISO>"
    }
    ```
+
+   **Required NEW fields** (research-engine v0.13+):
+
+   - `content_sha256`: After writing `<report_dir>/README.md` in step 3, compute its sha256 with `sha256sum <report_dir>/README.md | awk '{print $1}'` and patch it into `sources.json`. Order: write README.md → hash it → patch sources.json. README.md is the *content fingerprint authority*.
+   - `created_by`: Array of actors. For each adapter that contributed (Stage 4 dispatch), add `{actor_type: "adapter", id: "<adapter-name>", model: "<model-id-or-unknown>", ts: "<adapter-completion-ISO8601>"}`. Order: list adapters in the order they returned.
+
+   After step 7 (Notion push) prepends the `> 📒 Notion:` line to README.md, **recompute the sha256 and patch `sources.json.content_sha256`** so it always matches README.md byte-for-byte.
+
 3. Write `<report_dir>/README.md` using the templates in `lib/report_sections.md`. Merge findings by topic, not by adapter. Dedupe near-duplicate findings. Preserve `[n]` markers.
 
    **Dedupe is input-type-aware:**
@@ -113,6 +147,30 @@ Timeout per adapter: 5 minutes (configured implicitly by the agent runtime; do N
 5. For each unique `related[]` entry, write `<report_dir>/related/<kind>-<slug>.md` with a one-paragraph summary + URL. Deduplicate by URL.
 6. If any adapter had non-empty `failures[]`, include the `## 수집 실패 (Failures)` section in README.md.
 7. **Push to Notion (mirror)** — if `NOTION_TOKEN` + `NOTION_PARENT_PAGE_ID` are set (env or `~/.config/research-engine/notion.env`), run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/push_to_notion.sh" "<report_dir>"`. The script ensures a `research-engine` database exists under the parent page and upserts a **single row per session** (matched by `Slug`). The row's properties capture metadata (Title / Slug / Input URL / Input Type / Created / Purpose / Audience / Sources); the row's page body is a single consolidated report — `README.md` at the top, then one toggle each for Transcript / Followups / Related materials. Capture the returned Notion URL and add it to `sources.json` at `output_notion_url`. Prepend a `> 📒 Notion: <url>` line under the frontmatter of local `README.md`. If the env is not configured, skip silently (log one line).
+
+**Step 7.5 — Update dream-ledger + suggestion check**
+
+After step 7 (Notion push), call reindex once so the new session is reflected:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/memory_reindex.sh"
+```
+
+This rebuilds `research/_index/manifest.json` and refreshes `dream-ledger.json` (`sessions_since_last_dream` is recomputed from manifest vs `last_dream_at`).
+
+Then check whether to suggest `/dream`:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/lib/memory/ledger.mjs" --suggest? \
+  --ledger "research/_index/dream-ledger.json"
+# exit 0 + {"should":true,"count":N}  → 제안 줄을 step 8 final message에 포함
+# exit 1 + {"should":false,...}        → 제안 생략
+```
+
+If suggest = true, the `--suggest?` CLI also writes `suggestion_shown_at` back to the ledger automatically (so the same threshold isn't nagged repeatedly until the next threshold is crossed). Include exactly this line in step 8's final message:
+
+> 💡 dream-ledger: 마지막 dream 이후 {N}개 세션이 누적되었습니다. `/dream` 으로 패턴 인사이트를 추출할 수 있어요.
+
 8. Final message to user: one line with `<report_dir>/README.md` path + Notion URL (if pushed) + a 2-line TL;DR preview.
 
 ## Cache policy

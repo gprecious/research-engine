@@ -1,0 +1,13 @@
+{
+  "input": "https://youtu.be/legacy",
+  "input_type": "youtube",
+  "intent": {
+    "purpose": "테스트 목적",
+    "focus": "legacy fixture",
+    "audience_level": "테스트"
+  },
+  "created": "2026-04-01T10:00:00+09:00",
+  "sources": [
+    { "n": 1, "adapter": "youtube", "type": "youtube-captions", "url": "https://youtu.be/legacy", "title": "Legacy" }
+  ]
+}
