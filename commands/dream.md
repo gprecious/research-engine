@@ -91,6 +91,7 @@ Splits patterns into `insights/pattern-*.md`, writes `README.md` (frontmatter st
 📄 docs/dreams/<RUN_ID>/README.md
 2줄 TL;DR (from strongest pattern)
 N개 insight 파일 생성됨 — 부적절한 것은 README frontmatter의 status를 discarded로 변경하세요.
+💡 추출된 인사이트 중 adapter_failure_modes 항목이 있으면 `/evolve <adapter-name>` 으로 해당 어댑터 페르소나 진화 시도 가능.
 ```
 
 ## Failure handling
