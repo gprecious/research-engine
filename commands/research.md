@@ -39,6 +39,30 @@ Branch by `input_type`:
 
 Write the preview to `RESEARCH_DIR/<tmp-slug>/cache/preview-<cache_key>.json` (create dir if needed). Compute `cache_key` via `bash "${CLAUDE_PLUGIN_ROOT}/scripts/cache_key.sh" "<target>"`.
 
+### Stage 2.5 — Memory Query (prior_knowledge 자동 조회)
+
+After preview JSON is written, query memory for similar past sessions before moving to Stage 3:
+
+```bash
+# Build a target descriptor from preview-level info
+TARGET_JSON=$(jq -nc \
+  --arg t "<input_type>" \
+  --arg p "<intent.purpose 후보 (preview title/description에서 추출, 또는 빈 문자열)>" \
+  --arg sl "<slug 잠정>" \
+  --argjson topics '[]' \
+  '{input_type: $t, topics: $topics, intent: {purpose: $p}, slug: $sl}')
+
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/memory_query.sh" \
+  --target-json "${TARGET_JSON}" \
+  --top-k 5 \
+  --self-slug "<slug>" \
+  > "<report_dir>/cache/memory.json"
+```
+
+The query runs BEFORE Stage 3 Intent Q&A. At this point you only have preview-level info — that's enough for similarity matching. The result `cache/memory.json` is consumed in Stage 4 dispatch as `prior_knowledge`.
+
+If `cache/memory.json` is `{"similar_sessions":[],"dream_insights":[]}` (no priors), proceed normally — memory is optional and silently absent on first runs.
+
 ### Stage 3 — Intent Q&A
 
 Compute `slug`:
