@@ -5,6 +5,31 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
 ## [Unreleased]
 
+## [0.14.0]
+
+GEPA-lite 어댑터 프롬프트 진화 루프. `/evolve` 슬래시가 evolvable 마킹된 어댑터 영역을 mutate → bench `--candidates` 로 평가 → Pareto + paired-bootstrap CI 게이트 → accept/reject/hold. `/dream` D8 단계가 adapter_failure_modes 감지 시 `/evolve` 호출을 제안.
+
+### Added
+- `lib/evolve/` — Node ESM 유틸 (vitest)
+  - `extract_evolvable.mjs` — `<EVOLVABLE id="…">…</EVOLVABLE>` 마커 parse/replace.
+  - `pareto.mjs` — multi-metric dominance check (Pareto shed).
+  - `statistical_gate.mjs` — paired bootstrap CI 통계 게이트.
+  - `ledger.mjs` — `evolve-ledger.json` 상태기계.
+  - `archive.mjs` — `versions/` 아카이브 + path helpers.
+- `scripts/evolve_run.sh` + 네 개 Node wrapper (prepare/apply/decide/promote).
+- `commands/evolve.md` — `/evolve` 슬래시 E1~E8 시퀀스.
+- `agents/prompt-mutator.md` — mutation 에이전트 persona.
+- `bench/run.sh --candidates` — 후보 어댑터 swap → bench → restore (atomic, backup 기록).
+- `tests/research-engine/evolve.test.sh` + `evolve-e2e.test.sh` — 전체 accept/reject 사이클 bats.
+
+### Changed
+- `agents/youtube-adapter.md` — evolvable region 마킹.
+- `commands/dream.md` — D8 에서 `adapter_failure_modes` 있을 시 `/evolve` 제안 라인.
+- `commands/bench.md` — `--candidates` 플래그 spec.
+
+### Fixed
+- `scripts/memory_query.sh` — `--target-json` 값 누락 시 `shift 2` 가 silently 실패해서 무한루프 (CPU 46% × 8시간 hung 사례 관측). `shift; [ $# -gt 0 ] && shift` 로 underflow-safe 처리. 회귀 bats 추가.
+
 ## [0.13.0]
 
 Cross-session learning layer. `/research` 가 과거 유사 세션과 dream 인사이트를 자동으로 어댑터 dispatch 에 주입하고, 5회 누적 시 `/dream` 호출을 제안. `/dream` 슬래시는 N개 세션에서 반복 패턴·어댑터 실패·자주 묻는 의도·prior art 군집을 추출해 `docs/dreams/<run-id>/` 에 readonly 인사이트로 축적.
