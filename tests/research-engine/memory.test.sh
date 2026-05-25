@@ -83,6 +83,14 @@ teardown() {
   [ "$count" -le 3 ]
 }
 
+@test "memory_query: --target-json 값 누락 시 fail-soft (무한루프 회귀)" {
+  # regression: shift 2 with insufficient args used to infinite-loop at 100% CPU
+  cd "${TMP_HOME}"
+  run --separate-stderr timeout 5 bash "${REPO_ROOT}/scripts/memory_query.sh" --target-json
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | jq '.similar_sessions | length')" = "0" ]
+}
+
 @test "memory_query: --self-slug 자기 제외" {
   cd "${TMP_HOME}"
   bash "${REPO_ROOT}/scripts/memory_reindex.sh"

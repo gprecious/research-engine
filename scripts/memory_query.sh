@@ -12,9 +12,9 @@ SELF_SLUG=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --target-json) TARGET_JSON="${2:-}"; shift 2 ;;
-    --top-k) TOP_K="${2:-5}"; shift 2 ;;
-    --self-slug) SELF_SLUG="${2:-}"; shift 2 ;;
+    --target-json) TARGET_JSON="${2:-}"; shift; [ $# -gt 0 ] && shift ;;
+    --top-k) TOP_K="${2:-5}"; shift; [ $# -gt 0 ] && shift ;;
+    --self-slug) SELF_SLUG="${2:-}"; shift; [ $# -gt 0 ] && shift ;;
     *) shift ;;
   esac
 done
