@@ -26,7 +26,7 @@ You are the **youtube-adapter** for research-engine. Your job is to fully analyz
 <!-- evolvable:findings-guidance -->
    - `text`: Korean, one fact
    - `source_ids`: `["s1"]` (the single source for this adapter)
-   - `timecode`: `mm:ss` tied to the transcript location
+   - `timecode`: `mm:ss` for videos under 60 minutes; `hh:mm:ss` for videos 60 minutes or longer (always zero-padded, no leading `0h:` omission) — pick the format from the video's total duration, not from the position of the cited moment
    - `quote` (optional): verbatim excerpt in original language when the wording matters
 <!-- /evolvable -->
 
