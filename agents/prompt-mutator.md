@@ -18,7 +18,14 @@ The dispatcher passes a single JSON object:
   "region_id": "findings-guidance",
   "current_body": "the markdown body inside <!-- evolvable:findings-guidance -->...<!-- /evolvable -->",
   "dream_excerpts": [
-    {"run_id": "drm_2026-06-01-...", "category": "adapter_failure_modes", "text": "youtube-adapter often returns <6 findings when video <5min..."}
+    {
+      "run_id": "drm_2026-06-01-...",
+      "readme": "dream TOC: links to insights/pattern-*.md ...",
+      "insights": [
+        {"name": "pattern-adapter-failure-modes", "body": "youtube-adapter often returns <6 findings when video <5min..."},
+        {"name": "pattern-topic-coverage-gaps", "body": "..."}
+      ]
+    }
   ],
   "bench_weaknesses": [
     {"topic_id": "yt-short-talk", "judge_score": 0.42, "notes": "RE mode underperformed baseline by 0.18 on coverage axis"}
