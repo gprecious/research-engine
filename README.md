@@ -137,7 +137,7 @@ Spec: `docs/superpowers/specs/2026-04-26-research-engine-bench-design.md`.
 
 #### `/evolve` — 어댑터 페르소나 진화
 
-**전제** — 진화 대상 region 이 `<!-- evolvable:<id> -->` ... `<!-- /evolvable -->` 로 마킹되어 있어야 한다. 현재 `agents/youtube-adapter.md` 에 `findings-guidance`, `intent-tailoring` 두 region 이 마킹됨.
+**전제** — 진화 대상 region 이 `<!-- evolvable:<id> -->` ... `<!-- /evolvable -->` 로 마킹되어 있어야 한다. 현재 마킹된 region: `agents/youtube-adapter.md` 에 `findings-guidance`·`intent-tailoring`, `agents/context7-adapter.md` 에 `library-resolution`·`findings-guidance`, `agents/community-adapter.md` 에 `retry-policy`·`findings-guidance` (context7 quota 고갈·community throttle 이 실제 fetch 실패 빈발 지점이라는 dream 인사이트에 따라 추가).
 
 ```bash
 /evolve youtube-adapter findings-guidance
