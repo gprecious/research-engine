@@ -120,6 +120,74 @@ The matrix runs **inside the user's Claude Code session** (not as `claude -p` su
 
 Spec: `docs/superpowers/specs/2026-04-26-research-engine-bench-design.md`.
 
+### Cross-session learning (`/dream` + `/evolve`)
+
+두 슬래시는 누적된 `/research` 세션을 자기-개선 루프로 연결한다. `/dream` 은 여러 세션에서 패턴(어댑터 실패 모드, 반복 의도, prior-art 클러스터)을 추출해 `docs/dreams/<run-id>/insights/` 에 기록하고, `/evolve` 는 그 인사이트를 입력 삼아 어댑터 페르소나의 evolvable region 을 mutator 로 변형 → bench 비교 → paired bootstrap CI 게이트로 채택/거부/보류를 결정한다 (GEPA-lite). Lewis Jackson 의 self-improving agent 패턴을 통계적으로 다듬은 형태.
+
+#### `/dream` — 패턴 추출
+
+```bash
+/dream                       # 마지막 dream 이후 누적 세션 전체
+/dream --since=14d           # 최근 14일
+/dream --slugs=a,b,c         # 명시 슬러그
+/dream --bench=<run-id>      # bench 결과를 추가 입력으로
+```
+
+세션이 <2 개면 거부. 결과는 `docs/dreams/<run-id>/insights/pattern-*.md` 로 갈리며, README frontmatter 의 `status: active|discarded` 로 사후 솎아낼 수 있다. `adapter_failure_modes` 인사이트가 있으면 D8 마지막 메시지가 `/evolve` 를 안내한다.
+
+#### `/evolve` — 어댑터 페르소나 진화
+
+**전제** — 진화 대상 region 이 `<!-- evolvable:<id> -->` ... `<!-- /evolvable -->` 로 마킹되어 있어야 한다. 현재 `agents/youtube-adapter.md` 에 `findings-guidance`, `intent-tailoring` 두 region 이 마킹됨.
+
+```bash
+/evolve youtube-adapter findings-guidance
+```
+
+내부 E1~E8 단계:
+
+| 단계 | 동작 |
+|---|---|
+| E1 prepare | 현재 region body + 최근 dream insights 묶어 mutator 입력 JSON |
+| E2 mutate  | `agents/prompt-mutator.md` 가 변형 `variants[]` 생성 (한 번에 한 region) |
+| E3 apply   | `agents/<name>.candidate.md` 작성 (region 만 swap) |
+| E4 bench   | `/bench --candidates <name>:<path>` 로 후보 RE 매트릭스 실행 |
+| E5 decide  | paired bootstrap CI (`iters=2000, alpha=0.05, seed=42`) → `accept` / `reject` / `hold` |
+| E6 promote | accept 시 `agents/archive/<name>.v<N>.md` 보관 + 실제 페르소나 교체 |
+| E7 ledger  | `research/_index/evolve-ledger.json` 갱신 (Pareto frontier + shed-out 추적) |
+| E8 message | 결정 + CI + 메트릭 보고 |
+
+**수동 실행** (디버깅 / 비-슬래시 환경) — `scripts/evolve_run.sh` 가 prepare/apply/decide/promote 네 Node wrapper 를 디스패치:
+
+```bash
+bash scripts/evolve_run.sh prepare youtube-adapter findings-guidance > mut-in.json
+# prompt-mutator 직접 호출 → mut-out.json: {variants:[{body, rationale}]}
+bash scripts/evolve_run.sh apply youtube-adapter findings-guidance mut-out.json
+
+# bench candidate swap (.bench-restore/ 에 원본 백업; 재-swap 거부)
+bash bench/run.sh --swap-candidates "youtube-adapter:agents/youtube-adapter.candidate.md"
+/bench --topic <id>
+bash bench/run.sh --restore-candidates
+
+# bench 결과로부터 cur.json / cand.json 생성 후
+bash scripts/evolve_run.sh decide youtube-adapter cur.json cand.json
+bash scripts/evolve_run.sh promote youtube-adapter   # accept 시에만
+```
+
+**Ledger 확인 & roll back:**
+
+```bash
+jq . research/_index/evolve-ledger.json
+# adapters.<name>.{frontier, history, rejected, held}
+
+# 이전 버전으로 되돌리기
+ls agents/archive/youtube-adapter.v*.md
+cp agents/archive/youtube-adapter.v2.md agents/youtube-adapter.md
+```
+
+**주의** — mutator 페르소나는 "한 번에 한 region" 원칙을 강제한다 (Lewis Jackson 원칙). bench 표본이 적으면 (n<8) CI 폭이 커서 거의 항상 `hold` 가 나온다 — dream 누적이 적을 때도 마찬가지.
+
+Spec: `docs/superpowers/plans/2026-05-24-adapter-prompt-evolution-loop.md`.
+
 ## Notion mirroring (optional one-time setup)
 
 When `NOTION_TOKEN` + `NOTION_PARENT_PAGE_ID` are set, every `/research` run upserts a row in a `research-engine` database under the parent page. Each session is a single consolidated page whose body holds the main report plus collapsible toggles for transcript, followups, and related materials. Re-running the same session (e.g. via `/research-followup`) updates the row in place instead of duplicating.
