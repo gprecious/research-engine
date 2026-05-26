@@ -6,7 +6,7 @@
     "test": "vitest run",
     "test:unit": "vitest run lib tests/research-design/lib tests/research-design/schemas",
     "test:e2e": "playwright test --config tests/research-design/e2e/playwright.config.ts",
-    "test:bats": "bats tests/research-engine/spec.test.sh tests/research-engine/design.test.sh tests/research-engine/deploy.test.sh tests/research-engine/memory.test.sh tests/research-engine/dream.test.sh tests/research-engine/research-with-memory.test.sh tests/research-engine/dream-e2e.test.sh tests/research-engine/research-followup-occ.test.sh tests/research-engine/evolve.test.sh tests/research-engine/evolve-e2e.test.sh tests/research-engine/bench-candidates.test.sh",
+    "test:bats": "bats tests/research-engine/spec.test.sh tests/research-engine/design.test.sh tests/research-engine/deploy.test.sh tests/research-engine/memory.test.sh tests/research-engine/dream.test.sh tests/research-engine/research-with-memory.test.sh tests/research-engine/dream-e2e.test.sh tests/research-engine/research-followup-occ.test.sh tests/research-engine/evolve.test.sh tests/research-engine/evolve-e2e.test.sh tests/research-engine/bench-candidates.test.sh tests/research-engine/wiki.test.sh",
     "test:e2e:re": "playwright test --config tests/research-engine/e2e/playwright.config.ts"
   },
   "devDependencies": {
