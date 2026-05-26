@@ -58,3 +58,12 @@ Use Korean for synthesized findings and answers unless the user asks for another
 - For academic inputs, separate method, experiments, and author-stated limitations as described in `lib/report_sections.md`.
 - Record partial failures in the report instead of aborting the whole run.
 - Before claiming completion, verify that `README.md`, `sources.json`, and `intent.json` exist and citations in `README.md` correspond to entries in `sources.json`.
+
+## Wiki Workflow (Codex 패리티)
+`commands/wiki.md`가 정본. Codex에서 동일 계약으로:
+1. `wiki/` 없으면 생성 + `lib/wiki/AGENTS.template.md` → `wiki/AGENTS.md` 복사 + 빈 `index.md`.
+2. ingest: `research/<slug>`(raw 불변) + `wiki/index.md` 카탈로그 읽기 → 헌법대로 pagePlan JSON(tldr/perspective/links, links는 카탈로그 실재 slug만) 생성 → `node lib/wiki/apply.mjs --vault wiki --plan <tmp> --date <today>` **1회**.
+3. lint: `node lib/wiki/lint.mjs --vault wiki`.
+4. query: grep/카탈로그 후보 → 위키 페이지에서 인용 합성(읽기 전용). `--file` 환류·`lint --fix` 자동수정은 MVP out-of-scope(후속).
+5. publish: `scripts/wiki_publish.sh`.
+한글 합성, raw 절대 수정 금지, 무출처 주장 금지, slug ASCII.
