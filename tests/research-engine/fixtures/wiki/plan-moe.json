@@ -1,0 +1,13 @@
+{
+  "source": "research/2026-04-27-moe",
+  "pages": [
+    { "type": "concept", "title": "Mixture of Experts", "slug": "mixture-of-experts",
+      "aliases": ["MoE"], "sources": ["research/2026-04-27-moe"], "confidence": "high",
+      "tldr": "라우터가 토큰을 일부 전문가에게만 보낸다.",
+      "perspective": "- top-k 전문가 선택 [1].", "links": ["transformer"] },
+    { "type": "entity", "title": "Transformer", "slug": "transformer",
+      "sources": ["research/2026-04-27-moe"], "confidence": "high",
+      "tldr": "attention 기반 시퀀스 아키텍처.",
+      "perspective": "- self-attention 으로 토큰 상호작용 [1].", "links": [] }
+  ]
+}
