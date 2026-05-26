@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "adapters": {
+    "youtube-adapter": {
+      "current_version": 1,
+      "promoted_at": "2026-05-25T14:51:24.450Z",
+      "history": [
+        {
+          "version": 1,
+          "ci_lower": 1,
+          "metrics": {
+            "judge_score": 34.5,
+            "source_count": 1,
+            "type_diversity": 1,
+            "latency_inv": 0
+          },
+          "promoted_at": "2026-05-25T14:51:24.450Z"
+        }
+      ],
+      "frontier": [
+        {
+          "version": 1,
+          "ci_lower": 1,
+          "metrics": {
+            "judge_score": 34.5,
+            "source_count": 1,
+            "type_diversity": 1,
+            "latency_inv": 0
+          },
+          "promoted_at": "2026-05-25T14:51:24.450Z"
+        }
+      ],
+      "rejected": []
+    }
+  }
+}
