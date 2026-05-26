@@ -41,3 +41,6 @@ research/*/design/app/
 # Evolve loop: commit ledger, ignore ephemeral candidates
 !research/_index/evolve-ledger.json
 agents/*.candidate.md
+
+# Quartz publish dir (wiki_publish.sh 기본 QUARTZ_DIR)
+wiki-site/
