@@ -16,5 +16,8 @@
     "cloakbrowser": "^0.3.30",
     "playwright": "^1.60.0",
     "vitest": "^1.6.0"
+  },
+  "dependencies": {
+    "yaml": "^2.4.5"
   }
 }

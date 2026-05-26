@@ -4,6 +4,10 @@
 # research outputs (acceptance runs and real usage both land here)
 research/
 
+# llm-wiki content (개인 지식 — 플러그인 배포 제외, 발행은 wiki/ 자체 git repo로)
+# repo 루트의 콘텐츠 vault 만 무시 — lib/wiki/ 소스는 ship 되어야 하므로 leading-slash 로 앵커
+/wiki/
+
 # Node / Python / editors
 node_modules/
 __pycache__/
