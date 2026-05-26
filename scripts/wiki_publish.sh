@@ -15,10 +15,13 @@ CONTENT="${QUARTZ_DIR}/content"
 rm -rf "${CONTENT}"; mkdir -p "${CONTENT}"
 cp -r "${VAULT}/concepts" "${VAULT}/entities" "${CONTENT}/" 2>/dev/null || true
 cp "${VAULT}/index.md" "${CONTENT}/index.md" 2>/dev/null || true
+# 콘텐츠 복사 검증: index.md 가 실제로 들어가야 빈/기본 사이트 발행을 막는다
+test -f "${CONTENT}/index.md" || { echo "publish 실패: ${VAULT}/index.md 복사 안 됨 (vault에 index.md 없음?)" >&2; exit 1; }
 
 ( cd "${QUARTZ_DIR}" && npx quartz build )
-# smoke: index.html 생성 확인
+# smoke: index.html 생성 + 비어있지 않음 확인
 test -f "${QUARTZ_DIR}/public/index.html" || { echo "publish smoke 실패: public/index.html 없음" >&2; exit 1; }
+test -s "${QUARTZ_DIR}/public/index.html" || { echo "publish smoke 실패: public/index.html 비어있음" >&2; exit 1; }
 echo "built+smoke ok: ${QUARTZ_DIR}/public"
 
 if [ "${DEPLOY}" = "--deploy" ]; then
