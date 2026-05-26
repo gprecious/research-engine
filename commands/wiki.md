@@ -55,4 +55,6 @@ mkdir -p "${VAULT}/concepts" "${VAULT}/entities" "${VAULT}/_index"
 3. (MVP) `--fix`는 **보고 + 수정 안내**만(결정적 자동수정은 후속 spec). 예: broken-link는 어느 page의 `related`에서 어떤 `[[slug]]`를 지울지 안내.
 
 ## Action: publish
-(Task 10)
+인자: `[--deploy]`
+1. `bash "${CLAUDE_PLUGIN_ROOT}/scripts/wiki_publish.sh" <--deploy?>` (QUARTZ_DIR는 vault 밖, build+index smoke 포함).
+2. 산출물(`wiki-site/public`) 경로 보고. `--deploy`면 `WIKI_DEPLOY_TARGET`(예: `user@host:/var/www/wiki`)로 rsync 배포(hetzner LXC 또는 정적 호스트).

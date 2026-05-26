@@ -48,3 +48,9 @@ EOF
   echo "$output" | jq -e '.findings[] | select(.rule=="broken-link" and .slug=="a")'
   echo "$output" | jq -e '.findings[] | select(.rule=="unsourced" and .slug=="a")'
 }
+
+@test "publish: Quartz 미설치면 설치 안내 후 비정상 종료" {
+  QUARTZ_DIR="${TMP}/no-quartz" VAULT="${VAULT}" run bash "${REPO_ROOT}/scripts/wiki_publish.sh"
+  [ "$status" -ne 0 ]
+  echo "$output" | grep -q "Quartz 미설치"
+}
