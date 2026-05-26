@@ -46,7 +46,9 @@ mkdir -p "${VAULT}/concepts" "${VAULT}/entities" "${VAULT}/_index"
 (Task 9)
 
 ## Action: lint
-(Task 8)
+1. `node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/lint.mjs" --vault "${VAULT}"` → findings JSON.
+2. rule별로 묶어 한글 표로 보고(unsourced/citation-unresolved/broken-link/orphan/duplicate-name).
+3. (MVP) `--fix`는 **보고 + 수정 안내**만(결정적 자동수정은 후속 spec). 예: broken-link는 어느 page의 `related`에서 어떤 `[[slug]]`를 지울지 안내.
 
 ## Action: publish
 (Task 10)

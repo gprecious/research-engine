@@ -25,3 +25,26 @@ teardown() { rm -rf "${TMP}"; }
   [ "$(grep -c '### research/2026-04-27-moe' "${VAULT}/concepts/mixture-of-experts.md")" -eq 1 ]
   [ "$(grep -c 'ingest |' "${VAULT}/log.md")" -eq 1 ]
 }
+
+@test "lint CLI: 끊긴 링크·무출처 탐지" {
+  mkdir -p "${VAULT}/concepts"
+  cat > "${VAULT}/concepts/a.md" <<'EOF'
+---
+type: concept
+title: A
+slug: a
+sources: []
+related:
+  - "[[ghost]]"
+created: 2026-05-25
+updated: 2026-05-25
+---
+
+## 출처별 관점
+무출처 본문 주장
+EOF
+  run node "${REPO_ROOT}/lib/wiki/lint.mjs" --vault "${VAULT}"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.findings[] | select(.rule=="broken-link" and .slug=="a")'
+  echo "$output" | jq -e '.findings[] | select(.rule=="unsourced" and .slug=="a")'
+}
