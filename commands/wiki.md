@@ -43,7 +43,11 @@ mkdir -p "${VAULT}/concepts" "${VAULT}/entities" "${VAULT}/_index"
 - 일괄 종료 후 `lint`를 1회 실행해 요약 보고.
 
 ## Action: query
-(Task 9)
+인자: `"<질문>"` [`--file`]
+1. 후보 페이지 찾기 (임베딩 없음): `grep -ril "<핵심어>" "${VAULT}/concepts" "${VAULT}/entities"` + `wiki/index.md` 카탈로그를 훑어 관련 slug 선정.
+2. 후보 페이지를 읽어 **인용과 함께** 한글로 합성 답변. 각 사실에 출처 페이지 slug + 그 페이지의 `### research/<slug>` 인용을 명시. raw `research/`는 재독 금지(위키가 source-of-truth).
+3. **(MVP) `--file` 환류는 out-of-scope** — query 답변은 여러 위키 페이지·여러 research 세션을 합성하므로 단일 `### research/<slug>` 섹션 계약(pagePlan)에 안전히 매핑되지 않고 환각 전파 위험이 가장 크다. 다중-source pagePlan(`perspectives: [{source, body}]`) 도입을 후속 spec으로 미룬다. MVP는 **읽기 전용 답변**만.
+4. 답변을 인용 페이지 slug와 함께 보고.
 
 ## Action: lint
 1. `node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/lint.mjs" --vault "${VAULT}"` → findings JSON.
