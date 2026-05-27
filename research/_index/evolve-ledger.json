@@ -31,6 +31,68 @@
         }
       ],
       "rejected": []
+    },
+    "blog-adapter": {
+      "current_version": 1,
+      "promoted_at": "2026-05-26T23:59:54.518Z",
+      "history": [
+        {
+          "version": 1,
+          "ci_lower": 4,
+          "metrics": {
+            "judge_score": 6.666666666666667,
+            "source_count": 2.33,
+            "type_diversity": 2,
+            "latency_inv": 0
+          },
+          "promoted_at": "2026-05-26T23:59:54.518Z"
+        }
+      ],
+      "frontier": [
+        {
+          "version": 1,
+          "ci_lower": 4,
+          "metrics": {
+            "judge_score": 6.666666666666667,
+            "source_count": 2.33,
+            "type_diversity": 2,
+            "latency_inv": 0
+          },
+          "promoted_at": "2026-05-26T23:59:54.518Z"
+        }
+      ],
+      "rejected": []
+    },
+    "community-adapter": {
+      "current_version": 1,
+      "promoted_at": "2026-05-27T14:04:26.475Z",
+      "history": [
+        {
+          "version": 1,
+          "ci_lower": 7,
+          "metrics": {
+            "judge_score": 7.333333333333333,
+            "source_count": 1,
+            "type_diversity": 1,
+            "latency_inv": 0
+          },
+          "promoted_at": "2026-05-27T14:04:26.475Z"
+        }
+      ],
+      "frontier": [
+        {
+          "version": 1,
+          "ci_lower": 7,
+          "metrics": {
+            "judge_score": 7.333333333333333,
+            "source_count": 1,
+            "type_diversity": 1,
+            "latency_inv": 0
+          },
+          "promoted_at": "2026-05-27T14:04:26.475Z"
+        }
+      ],
+      "rejected": []
     }
   }
 }

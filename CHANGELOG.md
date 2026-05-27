@@ -5,6 +5,20 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
 ## [Unreleased]
 
+## [0.15.0]
+
+LLM 위키 레이어 + YouTube 프레임 watch + 어댑터 프롬프트 진화 3건 promote.
+
+### Added
+- **LLM 위키 레이어** (`/wiki ingest|query|lint|publish`) — research 세션을 개념·엔티티 페이지로 합성·상호링크. 카탈로그 기반 링크, 단일 원자 apply(섹션 merge·멱등·경로탈출 방어), Quartz 정적 발행. `lib/wiki/` (vitest) + `tests/research-engine/wiki.test.sh` (bats). claude×codex 3라운드 교차검증 + codex 구현리뷰 반영.
+- **YouTube 프레임 watch 추출** — `scripts/yt_fetch.sh` 가 캡션 외에 핵심 구간 프레임을 뽑아 시각 정보까지 findings 에 반영.
+- `agents/context7-adapter.md` · `agents/community-adapter.md` evolvable region 마킹.
+
+### Changed (adapter evolution — `/dream` → `/evolve` 자동 루프 산출)
+- **youtube-adapter v1** (CI 하한 +1) — 영상 길이 기반 `mm:ss`/`hh:mm:ss` timecode 결정적 선택.
+- **blog-adapter v1** (CI 하한 +4) — `fetch-strategy` region: 403/402·nav-only truncation 시 즉시 `failed` 대신 fallback ladder (firecrawl→WebFetch→r.jina.ai 리더→WebSearch 스니펫 salvage) + 알려진 차단 도메인 사전 경고. 차단 도메인 수확률 0→partial. 차단 도메인(all3dp) 타깃 bench, paired bootstrap accept.
+- **community-adapter v1** (CI 하한 +7) — `retry-policy` region: 스레드 403/402 시 skip 대신 fallback ladder (WebFetch→r.jina.ai→Reddit `.json`/old.reddit→WebSearch salvage), 404 만 즉시 skip. forum.bambulab(402) 타깃 bench, 도구 잠금 재측정으로 측정 오류 보정 후 accept.
+
 ## [0.14.0]
 
 GEPA-lite 어댑터 프롬프트 진화 루프. `/evolve` 슬래시가 evolvable 마킹된 어댑터 영역을 mutate → bench `--candidates` 로 평가 → Pareto + paired-bootstrap CI 게이트 → accept/reject/hold. `/dream` D8 단계가 adapter_failure_modes 감지 시 `/evolve` 호출을 제안.

@@ -39,6 +39,8 @@ Single fenced JSON block per `lib/adapter_contract.md`.
 ## Failure modes
 
 <!-- evolvable:retry-policy -->
-- Thread gone / 403 → skip, record in `failures[]`.
+- Thread blocked (403/402) or fetch failed → climb a fallback ladder before giving up: WebFetch → reader proxy (`https://r.jina.ai/<url>`) → for Reddit, retry the `old.reddit.com` host or append `.json` to the thread URL → WebSearch the thread title/permalink to salvage top-comment snippets.
+- Only record a `failures[]` skip after every rung of the ladder yields nothing; never skip on the first 403/402.
+- Thread gone (404 / removed / deleted) → skip immediately, record in `failures[]`.
 <!-- /evolvable -->
 - WebSearch yields nothing relevant → `status: "ok"` with empty findings, note "no community signal".
