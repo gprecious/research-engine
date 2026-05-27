@@ -11,7 +11,7 @@ Every adapter subagent MUST return a SINGLE fenced JSON block matching the schem
   "sources": [
     {
       "id": "s1",
-      "type": "youtube-captions | arxiv-paper | github-repo | blog-page | ...",
+      "type": "youtube-captions | youtube-whisper | youtube-frame | arxiv-paper | github-repo | blog-page | ...",
       "url": "https://...",
       "title": "...",
       "meta": { "anything": "json" }
@@ -21,6 +21,7 @@ Every adapter subagent MUST return a SINGLE fenced JSON block matching the schem
     {
       "text": "concise factual statement in Korean (or original for quotes)",
       "source_ids": ["s1", "s2"],
+      "source_type": "youtube-frame", // optional; use when one source has multiple evidence modes
       "timecode": "12:34",      // optional, YouTube only
       "quote": "optional verbatim excerpt"
     }

@@ -28,7 +28,7 @@ Use Korean for synthesized findings and answers unless the user asks for another
 1. Parse the request into `target`, optional `--yes`, optional `--fresh`, and optional `--slug <name>`.
 2. Classify the target with `scripts/classify_url.sh`.
 3. Preview the target:
-   - YouTube: verify `yt-dlp`; fetch metadata and captions with `scripts/yt_fetch.sh`.
+   - YouTube: verify `yt-dlp`; fetch metadata and transcript with `scripts/yt_fetch.sh`. Captions are preferred; if captions are absent, `captions` attempts Groq Whisper fallback from `GROQ_API_KEY` (env or `~/.config/research-engine/`) and otherwise returns partial status. For visual/demo/tutorial focus or missing transcript, run `scripts/yt_fetch.sh frames <url> <cache>/frames` and Read the JPEG paths in `frames.json`.
    - arXiv: fetch title, abstract, and body. Prefer `https://arxiv.org/html/<id>`; fall back to PDF.
    - GitHub: use `gh repo view` when authenticated; otherwise fetch public repo metadata and README from the web.
    - Blog/docs/community URL: fetch the page as markdown or readable text.

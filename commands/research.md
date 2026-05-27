@@ -30,7 +30,7 @@ Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/classify_url.sh" "<target>"`. Store the
 
 Branch by `input_type`:
 
-- **youtube** → Pre-flight: `command -v yt-dlp >/dev/null || { echo "yt-dlp not installed. Install with: pipx install yt-dlp  (or)  brew install yt-dlp" >&2; exit 1; }`. Then `bash "${CLAUDE_PLUGIN_ROOT}/scripts/yt_fetch.sh" metadata "<target>"` → parse title/description/chapters/selected_caption_lang. Extract roughly the first 5 minutes of the selected-lang captions by running `yt_fetch.sh captions` into a temporary dir (or reading cached VTT if it exists).
+- **youtube** → Pre-flight: `command -v yt-dlp >/dev/null || { echo "yt-dlp not installed. Install with: pipx install yt-dlp  (or)  brew install yt-dlp" >&2; exit 1; }`; also verify `ffmpeg` when visual/demo focus is likely. Then `bash "${CLAUDE_PLUGIN_ROOT}/scripts/yt_fetch.sh" metadata "<target>"` → parse title/description/chapters/selected_caption_lang. Extract roughly the first 5 minutes of transcript by running `yt_fetch.sh captions` into a temporary dir: captions are preferred, and when captions are absent the script attempts Groq Whisper fallback (`GROQ_API_KEY` from env or `~/.config/research-engine/`). For visual/demo/tutorial focus or missing transcript, run `yt_fetch.sh frames "<target>" "<tmp>/frames"` and preview the `frames.json` timecoded JPEG list.
 - **arxiv** → invoke the `huggingface-skills:hugging-face-paper-pages` skill with the arXiv id to get title+abstract.
 - **github** → `gh repo view <owner>/<repo> --json ...` + first 2 KB of README.
 - **huggingface** → `hf` CLI card summary.
