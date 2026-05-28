@@ -30,7 +30,7 @@
 | # | 화면 전용 사실 | 프레임 근거 |
 |---:|---|---|
 | 1 | 데모 UI 상단에 YouTube URL 입력칸과 `SUMMARIZE` 버튼이 있다. | `frame_0016`, `00:32` |
-| 2 | 데모 결과 패널 제목이 `Video Summary - Basic Walkthrough`로 보인다. | `frame_0016`, `00:32` |
+| 2 | 데모 결과 패널 제목이 `Video Summary — Real Analysis`로 보인다. | `frame_0016`, `00:32` |
 | 3 | 검은 배경의 채팅 화면에 `Moonlit chat?` 문구가 표시된다. | `frame_0011`-`frame_0013`, 약 `00:21`-`00:26` |
 | 4 | 3파트 카드의 세부 부제에 `yt-dlp + ffmpeg + whisper + claude`가 적혀 있다. | `frame_0031`, `01:04` |
 | 5 | 3파트 카드의 세 번째 항목 부제가 `Trend Scout + Notion`이다. | `frame_0031`, `01:04` |
