@@ -235,7 +235,11 @@ def rtext(s):
             out.extend(_rt_chunked(tok[1:-1], code=True))
         elif tok.startswith("["):
             lm = re.match(r"\[([^\]]+)\]\(([^)]+)\)", tok)
-            if lm:
+            # Only treat as a real link when the target is an http(s)/mailto URL.
+            # Citation/timecode markers like [1](00:09:30) or relative paths
+            # ([[wiki]], ./file.md) must render as literal text — Notion rejects
+            # non-URL link targets with 400 "Invalid URL for link".
+            if lm and re.match(r"(?i)^(https?://|mailto:)", lm.group(2)):
                 out.extend(_rt_chunked(lm.group(1), href=lm.group(2)))
             else:
                 out.extend(_rt_chunked(tok))
