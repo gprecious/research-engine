@@ -580,7 +580,12 @@ append_blocks_chunked() {
   while (( i < total )); do
     chunk="$(jq ".[${i}:$((i+90))]" <<< "$blocks")"
     body="$(jq --slurpfile c <(printf '%s' "$chunk") -n '{children: $c[0]}')"
-    _api PATCH "/blocks/${page_id}/children" "$body" > /dev/null
+    local _resp
+    _resp="$(_api PATCH "/blocks/${page_id}/children" "$body")"
+    if printf '%s' "$_resp" | grep -q '"status":[[:space:]]*[45]'; then
+      echo "push_to_notion: ERROR appending blocks (chunk $i/$total): $(printf '%s' "$_resp" | tr '\n' ' ' | head -c 400)" >&2
+      return 1
+    fi
     i=$((i+90))
   done
 }
