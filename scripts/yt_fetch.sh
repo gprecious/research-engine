@@ -138,19 +138,33 @@ auto_fps() {
     }'
 }
 
-load_groq_key() {
-  if [[ -n "${GROQ_API_KEY:-}" ]]; then
-    printf '%s' "$GROQ_API_KEY"
+load_key_var() {
+  # $1 = env var name (e.g. GROQ_API_KEY); remaining args = .env files to scan.
+  # Resolution order: process env → each file's "<VAR>=..." line (last wins per file).
+  local var="$1"; shift
+  if [[ -n "${!var:-}" ]]; then
+    printf '%s' "${!var}"
     return 0
   fi
-  local f
-  for f in "$HOME/.config/research-engine/groq.env" "$HOME/.config/research-engine/.env"; do
+  local f value
+  for f in "$@"; do
     [[ -f "$f" ]] || continue
-    local value
-    value="$(grep -E '^GROQ_API_KEY=' "$f" | tail -n1 | sed 's/^GROQ_API_KEY=//; s/^"//; s/"$//')"
+    value="$(grep -E "^${var}=" "$f" | tail -n1 | sed "s/^${var}=//; s/^\"//; s/\"\$//")"
     [[ -n "$value" ]] && { printf '%s' "$value"; return 0; }
   done
   return 1
+}
+
+load_groq_key() {
+  load_key_var GROQ_API_KEY \
+    "$HOME/.config/research-engine/groq.env" \
+    "$HOME/.config/research-engine/.env"
+}
+
+load_openai_key() {
+  load_key_var OPENAI_API_KEY \
+    "$HOME/.config/research-engine/openai.env" \
+    "$HOME/.config/research-engine/.env"
 }
 
 extract_audio() {
@@ -180,12 +194,43 @@ write_vtt_from_whisper_json() {
   } > "$vtt"
 }
 
+emit_whisper_ok() {
+  local json="$1" vtt="$2" model="$3"
+  write_vtt_from_whisper_json "$json" "$vtt"
+  jq -n --arg vtt "$vtt" --arg json "$json" --arg model "$model" \
+    '{status:"ok", transcript_source:"whisper", whisper_model:$model, transcript_vtt:$vtt, transcript_json:$json, failures:[]}'
+}
+
+# Posts the extracted audio to an OpenAI-compatible transcription endpoint.
+# `curl --retry` treats transient 408/429/5xx and timeouts as retryable, honoring
+# the server's Retry-After header (curl >= 7.66) with exponential backoff in between.
+# Returns 0 only on a 2xx response whose JSON carries a non-empty segments array.
+whisper_request() {
+  local endpoint="$1" model="$2" key="$3" audio="$4" out="$5"
+  local code
+  code="$(curl -sS \
+    --retry 4 --retry-delay 2 --retry-max-time 120 --max-time 900 \
+    -A "watch-skill/1.0 (+research-engine)" \
+    -H "Authorization: Bearer $key" \
+    -F "file=@$audio" \
+    -F "model=$model" \
+    -F "response_format=verbose_json" \
+    -F "temperature=0" \
+    -o "$out" \
+    -w '%{http_code}' \
+    "$endpoint" 2>/dev/null)" || code="000"
+  [[ "$code" == 2?? ]] || return 1
+  jq -e '.segments and (.segments | length > 0)' "$out" >/dev/null 2>&1
+}
+
 whisper_fallback() {
   local input="$1" dir="$2"
   mkdir -p "$dir"
-  local key
-  if ! key="$(load_groq_key)"; then
-    jq -n '{status:"partial", transcript_source:"none", failures:[{step:"whisper", error:"GROQ_API_KEY not configured"}]}'
+  local groq_key openai_key
+  groq_key="$(load_groq_key || true)"
+  openai_key="$(load_openai_key || true)"
+  if [[ -z "$groq_key" && -z "$openai_key" ]]; then
+    jq -n '{status:"partial", transcript_source:"none", failures:[{step:"whisper", error:"neither GROQ_API_KEY nor OPENAI_API_KEY configured"}]}'
     return 0
   fi
   command -v curl >/dev/null || die "curl not installed"
@@ -194,26 +239,28 @@ whisper_fallback() {
     return 0
   fi
   local response="$dir/whisper.json"
-  if ! curl -sS \
-    -A "watch-skill/1.0 (+research-engine)" \
-    -H "Authorization: Bearer $key" \
-    -F "file=@$dir/audio.mp3" \
-    -F "model=whisper-large-v3" \
-    -F "response_format=verbose_json" \
-    -F "temperature=0" \
-    "https://api.groq.com/openai/v1/audio/transcriptions" \
-    -o "$response"; then
-    jq -n '{status:"partial", transcript_source:"none", failures:[{step:"whisper", error:"Groq request failed"}]}'
-    return 0
+  local tried=()
+  # Prefer Groq (cheaper/faster); fall back to OpenAI whisper-1 on failure.
+  if [[ -n "$groq_key" ]]; then
+    if whisper_request "https://api.groq.com/openai/v1/audio/transcriptions" \
+         "whisper-large-v3" "$groq_key" "$dir/audio.mp3" "$response"; then
+      emit_whisper_ok "$response" "$dir/whisper.vtt" "groq:whisper-large-v3"
+      return 0
+    fi
+    tried+=("groq")
   fi
-  if jq -e '.segments and (.segments | length > 0)' "$response" >/dev/null 2>&1; then
-    write_vtt_from_whisper_json "$response" "$dir/whisper.vtt"
-    jq -n --arg vtt "$dir/whisper.vtt" --arg json "$response" \
-      '{status:"ok", transcript_source:"whisper", transcript_vtt:$vtt, transcript_json:$json, failures:[]}'
-  else
-    jq -n --arg json "$response" \
-      '{status:"partial", transcript_source:"none", transcript_json:$json, failures:[{step:"whisper", error:"Groq response did not include segments"}]}'
+  if [[ -n "$openai_key" ]]; then
+    if whisper_request "https://api.openai.com/v1/audio/transcriptions" \
+         "whisper-1" "$openai_key" "$dir/audio.mp3" "$response"; then
+      emit_whisper_ok "$response" "$dir/whisper.vtt" "openai:whisper-1"
+      return 0
+    fi
+    tried+=("openai")
   fi
+  local tried_csv
+  tried_csv="$(IFS=','; printf '%s' "${tried[*]}")"
+  jq -n --arg tried "$tried_csv" \
+    '{status:"partial", transcript_source:"none", failures:[{step:"whisper", error:("all configured whisper providers failed: " + $tried)}]}'
 }
 
 pick_caption_lang() {

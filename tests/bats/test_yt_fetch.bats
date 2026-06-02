@@ -102,7 +102,7 @@ SH
   grep -q "youtube:player_client=web_safari,mweb" "$TMPDIR_TEST/args.txt"
 }
 
-@test "captions subcommand reports partial when captions are absent and GROQ_API_KEY is unset" {
+@test "captions subcommand reports partial when captions are absent and no whisper key is set" {
   mkdir -p "$TMPDIR_TEST/bin"
   cat > "$TMPDIR_TEST/bin/yt-dlp" <<'SH'
 #!/usr/bin/env bash
@@ -110,9 +110,68 @@ exit 0
 SH
   chmod +x "$TMPDIR_TEST/bin/yt-dlp"
 
-  PATH="$TMPDIR_TEST/bin:$PATH" GROQ_API_KEY="" \
+  # HOME isolation so ~/.config/research-engine/*.env keys can't leak in.
+  HOME="$TMPDIR_TEST" \
+  PATH="$TMPDIR_TEST/bin:$PATH" GROQ_API_KEY="" OPENAI_API_KEY="" \
   run "$SCRIPT" captions "https://youtu.be/no-captions" "$TMPDIR_TEST/captions"
 
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.status == "partial" and .transcript_source == "none" and (.failures[]?.step == "whisper")' >/dev/null
+}
+
+@test "captions falls back to OpenAI whisper-1 when Groq fails, with curl retry enabled" {
+  # Media fixture carrying an audio track so extract_audio yields audio.mp3.
+  ffmpeg -f lavfi -i sine=frequency=1000:duration=2 \
+    -f lavfi -i testsrc=size=320x180:rate=10:duration=2 \
+    -shortest -pix_fmt yuv420p "$TMPDIR_TEST/av.mp4" >/dev/null 2>&1
+
+  mkdir -p "$TMPDIR_TEST/bin"
+  # yt-dlp: emit no captions on the caption pass; copy the fixture on the download pass.
+  cat > "$TMPDIR_TEST/bin/yt-dlp" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  *--write-sub*) exit 0 ;;
+esac
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+if [ -n "$out" ]; then
+  target="${out/\%(ext)s/mp4}"
+  mkdir -p "$(dirname "$target")"
+  cp "$AV_FIXTURE" "$target"
+fi
+exit 0
+SH
+  chmod +x "$TMPDIR_TEST/bin/yt-dlp"
+
+  # curl: Groq endpoint returns 429, OpenAI returns 200 with segments. Record args.
+  cat > "$TMPDIR_TEST/bin/curl" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$CURL_ARGS_FILE"
+out=""; url=""; prev=""
+for a in "$@"; do
+  [ "$prev" = "-o" ] && out="$a"
+  case "$a" in https://*) url="$a" ;; esac
+  prev="$a"
+done
+case "$url" in
+  *groq.com*)   printf '{"error":{"message":"rate limited"}}' > "$out"; printf '429'; exit 0 ;;
+  *openai.com*) printf '{"segments":[{"start":0,"end":1.5,"text":"hello"}]}' > "$out"; printf '200'; exit 0 ;;
+esac
+printf '000'; exit 0
+SH
+  chmod +x "$TMPDIR_TEST/bin/curl"
+
+  HOME="$TMPDIR_TEST" \
+  AV_FIXTURE="$TMPDIR_TEST/av.mp4" \
+  CURL_ARGS_FILE="$TMPDIR_TEST/curl-args.txt" \
+  PATH="$TMPDIR_TEST/bin:$PATH" \
+  GROQ_API_KEY="gsk_test" OPENAI_API_KEY="sk_test" \
+  run "$SCRIPT" captions "https://youtu.be/no-caps" "$TMPDIR_TEST/cap"
+
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.status == "ok" and .transcript_source == "whisper" and (.whisper_model | test("openai"))' >/dev/null
+  [ -s "$TMPDIR_TEST/cap/whisper.vtt" ]
+  grep -q -- "--retry" "$TMPDIR_TEST/curl-args.txt"
+  grep -q "groq.com" "$TMPDIR_TEST/curl-args.txt"
+  grep -q "openai.com" "$TMPDIR_TEST/curl-args.txt"
 }

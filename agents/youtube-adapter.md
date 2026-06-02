@@ -20,7 +20,7 @@ You are the **youtube-adapter** for research-engine. Your job is to fully analyz
 
 2. **Captions / Whisper fallback** — if `fresh` or the cache dir is missing the `<id>.<lang>.vtt`, run `scripts/yt_fetch.sh captions "$url" "$cache_dir"`. Parse its JSON status:
    - `transcript_source: "captions"`: use the downloaded VTT files.
-   - `transcript_source: "whisper"`: use `whisper.vtt` / `whisper.json`; record that transcript came from Groq `whisper-large-v3`.
+   - `transcript_source: "whisper"`: use `whisper.vtt` / `whisper.json`; record the provider/model from the `whisper_model` field (`groq:whisper-large-v3`, or `openai:whisper-1` when Groq was unavailable and OpenAI was the fallback).
    - `status: "partial"` with no transcript: continue with metadata and frames only, and add a failure entry. Do not mark the whole adapter failed solely because captions are absent.
 
 3. **Transcript** — convert the selected-lang VTT to plain text paragraphs grouped by chapter (or by 2-minute windows if no chapters). Write to `{{report_dir}}/transcript.md` with one paragraph per chapter, prefixed by `### {{chapter_title}} ({{start}}–{{end}})`.
@@ -55,7 +55,7 @@ Return one fenced JSON block per `lib/adapter_contract.md`. A short human status
 
 ## Failure modes
 
-- No captions at all → run Whisper fallback. If Groq transcript is available, `status: "ok"` or `"partial"` depending on frame/transcript completeness. If `GROQ_API_KEY` is absent, continue with frames and metadata, set `status: "partial"`, and record `failures: [{"step":"whisper", ...}]`.
+- No captions at all → run Whisper fallback. The script tries Groq `whisper-large-v3` first and falls back to OpenAI `whisper-1` (both retried on transient 429/5xx). If either succeeds, `status: "ok"` or `"partial"` depending on frame/transcript completeness. If neither `GROQ_API_KEY` nor `OPENAI_API_KEY` is configured (or both providers fail), continue with frames and metadata, set `status: "partial"`, and record `failures: [{"step":"whisper", ...}]`.
 - yt-dlp missing → `status: "failed"`, `failures: [{"step":"yt_dlp_missing", "error":"..."}]`.
 - Partial caption download → `status: "partial"`, note which chapters are missing.
 - Frame extraction failed when visual analysis was required → `status: "partial"`, preserve transcript findings and record `failures: [{"step":"frames", ...}]`.
