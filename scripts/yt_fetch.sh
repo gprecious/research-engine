@@ -4,7 +4,11 @@
 # Subcommands:
 #   metadata <URL>                       — prints JSON with selected caption lang
 #   metadata --from-fixture <PATH>       — same, but reads a local JSON dump (for tests)
-#   captions <URL> <DIR>                 — downloads captions, falls back to Groq Whisper when absent
+#   media <URL> <DIR>                    — downloads the video once, prints {status, path, cached}
+#   transcribe <FILE|URL> <DIR>          — Whisper transcription directly (no caption check)
+#   captions <URL> <DIR> [--captions-only]
+#                                         — downloads captions; falls back to Groq Whisper when
+#                                           absent unless --captions-only is given
 #   frames <URL|FILE> <DIR> [--start S] [--end E]
 #                                         — extracts sampled JPEG frames + frames.json
 #
@@ -226,6 +230,12 @@ whisper_request() {
 whisper_fallback() {
   local input="$1" dir="$2"
   mkdir -p "$dir"
+  # 재사용 가드: 이전 실행의 whisper 산출물이 있으면 API 호출 없이 반환 (비용 중복 방지)
+  if [[ -s "$dir/whisper.vtt" && -s "$dir/whisper.json" ]]; then
+    jq -n --arg vtt "$dir/whisper.vtt" --arg json "$dir/whisper.json" \
+      '{status:"ok", transcript_source:"whisper", whisper_model:"cached", transcript_vtt:$vtt, transcript_json:$json, failures:[]}'
+    return 0
+  fi
   local groq_key openai_key
   groq_key="$(load_groq_key || true)"
   openai_key="$(load_openai_key || true)"
@@ -304,11 +314,52 @@ case "${1:-}" in
       '. + {selected_caption_lang: $lang, caption_langs_available: $langs}'
     ;;
 
-  captions)
-    [[ $# -eq 3 ]] || die "captions needs <URL> <DIR>"
+  media)
+    [[ $# -eq 3 ]] || die "media needs <URL> <DIR>"
     url="$2"; dir="$3"
+    command -v ffprobe >/dev/null || die "ffprobe not installed"
     mkdir -p "$dir"
-    before_count="$(find "$dir" -maxdepth 1 -type f -name '*.vtt' | wc -l | tr -d ' ')"
+    # 캐시 후보: .part(중단된 다운로드) 제외, find -print -quit 로 pipefail-안전하게 1개만
+    existing="$(find "$dir" -maxdepth 1 -type f \( -name 'video.*' -o -name '*.mp4' -o -name '*.mkv' -o -name '*.webm' \) ! -name '*.part' -print -quit)"
+    if [[ -n "$existing" ]]; then
+      if ffprobe -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 "$existing" 2>/dev/null | grep -q audio; then
+        jq -n --arg path "$(abs_path "$existing")" '{status:"ok", path:$path, cached:true}'
+        exit 0
+      fi
+      rm -f "$existing"   # 오디오 스트림 없음(병합 전 잔존물 등) — 깨진 캐시 제거 후 재다운로드
+    fi
+    # 임시 디렉토리에 받고 완료 후 move — 중단된 다운로드가 캐시 후보로 보이지 않게
+    tmp_dir="$dir/.dl-tmp"
+    rm -rf "$tmp_dir"; mkdir -p "$tmp_dir"
+    if ! media_path="$(download_video "$url" "$tmp_dir")"; then
+      die "media download failed: $url"
+    fi
+    [[ -n "$media_path" && -f "$media_path" ]] || die "media download failed: $url"
+    final="$dir/$(basename "$media_path")"
+    mv -f "$media_path" "$final"
+    rm -rf "$tmp_dir"
+    jq -n --arg path "$(abs_path "$final")" '{status:"ok", path:$path, cached:false}'
+    ;;
+
+  transcribe)
+    [[ $# -eq 3 ]] || die "transcribe needs <FILE|URL> <DIR>"
+    whisper_fallback "$2" "$3"
+    ;;
+
+  captions)
+    shift
+    captions_only=false
+    positional=()
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --captions-only) captions_only=true; shift ;;
+        *) positional+=("$1"); shift ;;
+      esac
+    done
+    [[ ${#positional[@]} -eq 2 ]] || die "captions needs <URL> <DIR> [--captions-only]"
+    url="${positional[0]}"; dir="${positional[1]}"
+    mkdir -p "$dir"
+    before_count="$(find "$dir" -maxdepth 1 -type f -name '*.vtt' ! -name 'whisper.vtt' | wc -l | tr -d ' ')"
     # Download all available subs and auto-captions (orchestrator will pick).
     yt_dlp_capture_with_recovery \
       --ignore-no-formats-error \
@@ -319,15 +370,20 @@ case "${1:-}" in
       --convert-subs "vtt" \
       -o "$dir/%(id)s.%(ext)s" \
       "$url" >/dev/null 2>"$dir/captions.stderr" || true
-    after_count="$(find "$dir" -maxdepth 1 -type f -name '*.vtt' | wc -l | tr -d ' ')"
+    after_count="$(find "$dir" -maxdepth 1 -type f -name '*.vtt' ! -name 'whisper.vtt' | wc -l | tr -d ' ')"
     if [[ "$after_count" -gt "$before_count" || "$after_count" -gt 0 ]]; then
-      mapfile -t vtts < <(find "$dir" -maxdepth 1 -type f -name '*.vtt' | sort)
+      mapfile -t vtts < <(find "$dir" -maxdepth 1 -type f -name '*.vtt' ! -name 'whisper.vtt' | sort)
       printf '%s\n' "${vtts[@]}" | jq -R -s '
         split("\n") | map(select(length > 0)) as $files
         | {status:"ok", transcript_source:"captions", caption_files:$files, failures:[]}
       '
     else
-      whisper_fallback "$url" "$dir"
+      if [[ "$captions_only" == true ]]; then
+        # 교차 검증 전용 모드: 자막 부재는 실패가 아닌 정상 결과
+        jq -n '{status:"ok", transcript_source:"none", caption_files:[], failures:[]}'
+      else
+        whisper_fallback "$url" "$dir"
+      fi
     fi
     ;;
 
@@ -395,7 +451,7 @@ case "${1:-}" in
     ;;
 
   ""|-h|--help)
-    sed -n '2,10p' "$0"
+    sed -n '2,13p' "$0"
     exit 1
     ;;
 

@@ -175,3 +175,262 @@ SH
   grep -q "groq.com" "$TMPDIR_TEST/curl-args.txt"
   grep -q "openai.com" "$TMPDIR_TEST/curl-args.txt"
 }
+
+@test "media subcommand downloads once and reuses cached file on second call" {
+  # 캐시 재사용 검증은 ffprobe 오디오 스트림 체크를 통과해야 하므로 실제 AV fixture 사용
+  ffmpeg -f lavfi -i sine=frequency=1000:duration=1 \
+    -f lavfi -i testsrc=size=320x180:rate=10:duration=1 \
+    -shortest -pix_fmt yuv420p "$TMPDIR_TEST/src.mp4" >/dev/null 2>&1
+
+  mkdir -p "$TMPDIR_TEST/bin"
+  # yt-dlp mock: 호출 횟수를 기록하고, -o 타깃 위치에 fixture 를 복사
+  cat > "$TMPDIR_TEST/bin/yt-dlp" <<'SH'
+#!/usr/bin/env bash
+count="$(cat "$COUNT_FILE" 2>/dev/null || echo 0)"
+printf '%s' "$((count + 1))" > "$COUNT_FILE"
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+if [ -n "$out" ]; then
+  target="${out/\%(ext)s/mp4}"
+  mkdir -p "$(dirname "$target")"
+  cp "$SRC_FIXTURE" "$target"
+fi
+exit 0
+SH
+  chmod +x "$TMPDIR_TEST/bin/yt-dlp"
+
+  COUNT_FILE="$TMPDIR_TEST/count" SRC_FIXTURE="$TMPDIR_TEST/src.mp4" \
+  PATH="$TMPDIR_TEST/bin:$PATH" \
+  run "$SCRIPT" media "https://youtu.be/example" "$TMPDIR_TEST/media"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.status == "ok" and .cached == false and (.path | endswith(".mp4"))' >/dev/null
+  [ -s "$(echo "$output" | jq -r '.path')" ]
+
+  # 두 번째 호출: 캐시 재사용 — yt-dlp 가 다시 호출되지 않아야 함
+  COUNT_FILE="$TMPDIR_TEST/count" SRC_FIXTURE="$TMPDIR_TEST/src.mp4" \
+  PATH="$TMPDIR_TEST/bin:$PATH" \
+  run "$SCRIPT" media "https://youtu.be/example" "$TMPDIR_TEST/media"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.status == "ok" and .cached == true' >/dev/null
+  [ "$(cat "$TMPDIR_TEST/count")" = "1" ]
+}
+
+@test "media subcommand rejects .part and audio-less files as cache" {
+  # 깨진 캐시 후보를 미리 배치: 오디오 없는 video-only 파일 + 중단된 .part
+  ffmpeg -f lavfi -i testsrc=size=320x180:rate=10 -t 1 \
+    -pix_fmt yuv420p "$TMPDIR_TEST/videoonly.mp4" >/dev/null 2>&1
+  mkdir -p "$TMPDIR_TEST/media"
+  cp "$TMPDIR_TEST/videoonly.mp4" "$TMPDIR_TEST/media/video.mp4"
+  printf 'partial-bytes' > "$TMPDIR_TEST/media/video.mp4.part"
+
+  # 정상 AV fixture + mock yt-dlp (위 테스트와 동일 mock)
+  ffmpeg -f lavfi -i sine=frequency=1000:duration=1 \
+    -f lavfi -i testsrc=size=320x180:rate=10:duration=1 \
+    -shortest -pix_fmt yuv420p "$TMPDIR_TEST/src.mp4" >/dev/null 2>&1
+  mkdir -p "$TMPDIR_TEST/bin"
+  cat > "$TMPDIR_TEST/bin/yt-dlp" <<'SH'
+#!/usr/bin/env bash
+count="$(cat "$COUNT_FILE" 2>/dev/null || echo 0)"
+printf '%s' "$((count + 1))" > "$COUNT_FILE"
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+if [ -n "$out" ]; then
+  target="${out/\%(ext)s/mp4}"
+  mkdir -p "$(dirname "$target")"
+  cp "$SRC_FIXTURE" "$target"
+fi
+exit 0
+SH
+  chmod +x "$TMPDIR_TEST/bin/yt-dlp"
+
+  COUNT_FILE="$TMPDIR_TEST/count" SRC_FIXTURE="$TMPDIR_TEST/src.mp4" \
+  PATH="$TMPDIR_TEST/bin:$PATH" \
+  run "$SCRIPT" media "https://youtu.be/example" "$TMPDIR_TEST/media"
+  [ "$status" -eq 0 ]
+  # 오디오 없는 캐시 후보는 거부되고 재다운로드 (cached:false, yt-dlp 1회)
+  echo "$output" | jq -e '.status == "ok" and .cached == false' >/dev/null
+  [ "$(cat "$TMPDIR_TEST/count")" = "1" ]
+  # 결과 파일은 오디오 스트림 보유
+  ffprobe -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 \
+    "$(echo "$output" | jq -r '.path')" | grep -q audio
+}
+
+@test "transcribe subcommand runs Whisper directly on a local media file" {
+  # 오디오 트랙이 있는 로컬 미디어 → extract_audio 가 audio.mp3 생성 가능해야 함
+  ffmpeg -f lavfi -i sine=frequency=1000:duration=2 \
+    -f lavfi -i testsrc=size=320x180:rate=10:duration=2 \
+    -shortest -pix_fmt yuv420p "$TMPDIR_TEST/av.mp4" >/dev/null 2>&1
+
+  mkdir -p "$TMPDIR_TEST/bin"
+  # curl mock: Groq 엔드포인트가 200 + segments 반환
+  cat > "$TMPDIR_TEST/bin/curl" <<'SH'
+#!/usr/bin/env bash
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+printf '{"segments":[{"start":0,"end":1.5,"text":"hello av-first"}]}' > "$out"
+printf '200'
+SH
+  chmod +x "$TMPDIR_TEST/bin/curl"
+
+  HOME="$TMPDIR_TEST" \
+  PATH="$TMPDIR_TEST/bin:$PATH" GROQ_API_KEY="gsk_test" OPENAI_API_KEY="" \
+  run "$SCRIPT" transcribe "$TMPDIR_TEST/av.mp4" "$TMPDIR_TEST/tr"
+
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.status == "ok" and .transcript_source == "whisper" and (.whisper_model | test("groq"))' >/dev/null
+  [ -s "$TMPDIR_TEST/tr/whisper.vtt" ]
+  grep -q "hello av-first" "$TMPDIR_TEST/tr/whisper.vtt"
+}
+
+@test "transcribe subcommand reports partial when no whisper keys configured" {
+  printf 'x' > "$TMPDIR_TEST/fake.mp4"
+  # HOME 격리로 ~/.config/research-engine/*.env 키 누출 차단
+  HOME="$TMPDIR_TEST" GROQ_API_KEY="" OPENAI_API_KEY="" \
+  run "$SCRIPT" transcribe "$TMPDIR_TEST/fake.mp4" "$TMPDIR_TEST/tr"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.status == "partial" and .transcript_source == "none" and (.failures[]?.step == "whisper")' >/dev/null
+}
+
+@test "transcribe reuses existing whisper output without calling the API" {
+  ffmpeg -f lavfi -i sine=frequency=1000:duration=2 \
+    -f lavfi -i testsrc=size=320x180:rate=10:duration=2 \
+    -shortest -pix_fmt yuv420p "$TMPDIR_TEST/av.mp4" >/dev/null 2>&1
+
+  mkdir -p "$TMPDIR_TEST/bin"
+  cat > "$TMPDIR_TEST/bin/curl" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$CURL_ARGS_FILE"
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+printf '{"segments":[{"start":0,"end":1.5,"text":"first run"}]}' > "$out"
+printf '200'
+SH
+  chmod +x "$TMPDIR_TEST/bin/curl"
+
+  # 1차: API 호출로 whisper.vtt/json 생성
+  HOME="$TMPDIR_TEST" CURL_ARGS_FILE="$TMPDIR_TEST/curl-args.txt" \
+  PATH="$TMPDIR_TEST/bin:$PATH" GROQ_API_KEY="gsk_test" OPENAI_API_KEY="" \
+  run "$SCRIPT" transcribe "$TMPDIR_TEST/av.mp4" "$TMPDIR_TEST/tr"
+  [ "$status" -eq 0 ]
+  [ -s "$TMPDIR_TEST/curl-args.txt" ]
+
+  # 2차: 기존 산출물 재사용 — curl 미호출, whisper_model == "cached"
+  rm -f "$TMPDIR_TEST/curl-args.txt"
+  HOME="$TMPDIR_TEST" CURL_ARGS_FILE="$TMPDIR_TEST/curl-args.txt" \
+  PATH="$TMPDIR_TEST/bin:$PATH" GROQ_API_KEY="gsk_test" OPENAI_API_KEY="" \
+  run "$SCRIPT" transcribe "$TMPDIR_TEST/av.mp4" "$TMPDIR_TEST/tr"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.status == "ok" and .transcript_source == "whisper" and .whisper_model == "cached"' >/dev/null
+  [ ! -f "$TMPDIR_TEST/curl-args.txt" ]
+}
+
+@test "captions --captions-only skips whisper fallback when captions are absent" {
+  mkdir -p "$TMPDIR_TEST/bin"
+  cat > "$TMPDIR_TEST/bin/yt-dlp" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "$TMPDIR_TEST/bin/yt-dlp"
+  # curl mock: 호출되면 기록 — 이 테스트에서는 호출되지 않아야 함
+  cat > "$TMPDIR_TEST/bin/curl" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$CURL_ARGS_FILE"
+printf '000'
+SH
+  chmod +x "$TMPDIR_TEST/bin/curl"
+
+  # 키를 일부러 설정 — 키 부재가 아니라 플래그가 whisper 를 막는다는 것을 검증
+  HOME="$TMPDIR_TEST" CURL_ARGS_FILE="$TMPDIR_TEST/curl-args.txt" \
+  PATH="$TMPDIR_TEST/bin:$PATH" GROQ_API_KEY="gsk_test" OPENAI_API_KEY="sk_test" \
+  run "$SCRIPT" captions "https://youtu.be/no-caps" "$TMPDIR_TEST/cap" --captions-only
+
+  [ "$status" -eq 0 ]
+  # 교차 검증 모드에서 자막 부재는 실패가 아닌 정상 결과 → status "ok"
+  echo "$output" | jq -e '.status == "ok" and .transcript_source == "none" and (.caption_files | length == 0) and (.failures | length == 0)' >/dev/null
+  [ ! -f "$TMPDIR_TEST/curl-args.txt" ]
+}
+
+@test "captions does not count whisper.vtt as a caption file" {
+  # 같은 디렉토리에 whisper.vtt 가 이미 있어도 자막으로 오인하지 않아야 함 (오염 regression)
+  mkdir -p "$TMPDIR_TEST/cap"
+  printf 'WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nwhisper text\n' > "$TMPDIR_TEST/cap/whisper.vtt"
+
+  mkdir -p "$TMPDIR_TEST/bin"
+  cat > "$TMPDIR_TEST/bin/yt-dlp" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "$TMPDIR_TEST/bin/yt-dlp"
+
+  HOME="$TMPDIR_TEST" PATH="$TMPDIR_TEST/bin:$PATH" GROQ_API_KEY="" OPENAI_API_KEY="" \
+  run "$SCRIPT" captions "https://youtu.be/no-caps" "$TMPDIR_TEST/cap" --captions-only
+
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.transcript_source == "none" and (.caption_files | length == 0)' >/dev/null
+}
+
+@test "AV-first sequence: single download, separated whisper/captions outputs" {
+  ffmpeg -f lavfi -i sine=frequency=1000:duration=2 \
+    -f lavfi -i testsrc=size=320x180:rate=10:duration=2 \
+    -shortest -pix_fmt yuv420p "$TMPDIR_TEST/av.mp4" >/dev/null 2>&1
+
+  mkdir -p "$TMPDIR_TEST/bin"
+  # yt-dlp mock: caption pass(--write-sub)는 자막 없이 종료(카운트 제외),
+  # 다운로드 pass 만 카운트하며 fixture 복사
+  cat > "$TMPDIR_TEST/bin/yt-dlp" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  *--write-sub*) exit 0 ;;
+esac
+count="$(cat "$COUNT_FILE" 2>/dev/null || echo 0)"
+printf '%s' "$((count + 1))" > "$COUNT_FILE"
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+if [ -n "$out" ]; then
+  target="${out/\%(ext)s/mp4}"
+  mkdir -p "$(dirname "$target")"
+  cp "$SRC_FIXTURE" "$target"
+fi
+exit 0
+SH
+  chmod +x "$TMPDIR_TEST/bin/yt-dlp"
+  cat > "$TMPDIR_TEST/bin/curl" <<'SH'
+#!/usr/bin/env bash
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+printf '{"segments":[{"start":0,"end":1.5,"text":"integration hello"}]}' > "$out"
+printf '200'
+SH
+  chmod +x "$TMPDIR_TEST/bin/curl"
+
+  CACHE="$TMPDIR_TEST/yt-cache"
+
+  # 1) media — 다운로드 1회
+  COUNT_FILE="$TMPDIR_TEST/count" SRC_FIXTURE="$TMPDIR_TEST/av.mp4" \
+  PATH="$TMPDIR_TEST/bin:$PATH" \
+  run "$SCRIPT" media "https://youtu.be/example" "$CACHE/media"
+  [ "$status" -eq 0 ]
+  MEDIA_PATH="$(echo "$output" | jq -r '.path')"
+
+  # 2) frames — 로컬 파일 입력 (URL 아님 → yt-dlp 미호출)
+  PATH="$TMPDIR_TEST/bin:$PATH" \
+  run "$SCRIPT" frames "$MEDIA_PATH" "$CACHE/frames" --start 0 --end 2
+  [ "$status" -eq 0 ]
+  [ -s "$CACHE/frames/frames.json" ]
+
+  # 3) transcribe — whisper/ 전용 디렉토리
+  HOME="$TMPDIR_TEST" PATH="$TMPDIR_TEST/bin:$PATH" GROQ_API_KEY="gsk_test" OPENAI_API_KEY="" \
+  run "$SCRIPT" transcribe "$MEDIA_PATH" "$CACHE/whisper"
+  [ "$status" -eq 0 ]
+  [ -s "$CACHE/whisper/whisper.vtt" ]
+
+  # 4) captions --captions-only — captions/ 전용 디렉토리, whisper 산출물과 미혼합
+  COUNT_FILE="$TMPDIR_TEST/count" SRC_FIXTURE="$TMPDIR_TEST/av.mp4" \
+  HOME="$TMPDIR_TEST" PATH="$TMPDIR_TEST/bin:$PATH" \
+  run "$SCRIPT" captions "https://youtu.be/example" "$CACHE/captions" --captions-only
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.transcript_source == "none" and (.caption_files | length == 0)' >/dev/null
+
+  # 영상 다운로드는 전체 시퀀스에서 정확히 1회
+  [ "$(cat "$TMPDIR_TEST/count")" = "1" ]
+}

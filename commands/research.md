@@ -108,7 +108,7 @@ prior_knowledge (when non-empty) contains the contents of <report_dir>/cache/mem
 Return a single fenced JSON block per lib/adapter_contract.md. Do not include anything after the JSON block.
 ```
 
-Timeout per adapter: 5 minutes (configured implicitly by the agent runtime; do NOT actively retry beyond the single dispatch). If an adapter returns non-JSON or malformed JSON, record it as a failure and continue.
+Timeout per adapter: 5 minutes — except youtube-adapter: 20 minutes (AV-first media download + Whisper transcription scale with video length; no length cap per spec). Configured implicitly by the agent runtime; do NOT actively retry beyond the single dispatch. If an adapter returns non-JSON or malformed JSON, record it as a failure and continue.
 
 ### Stage 5 — Synthesize & Persist
 

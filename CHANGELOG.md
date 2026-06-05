@@ -5,6 +5,29 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
 ## [Unreleased]
 
+## [0.17.0]
+
+YouTube 분석 AV-first 전환 — 영상(frames)+오디오(Whisper)를 모든 영상에서 기본 수행, 자막은 교차 검증용. herdr 3-worker(claude/codex/omp) 상호 비판 리뷰 합의 반영.
+
+### Added
+- `scripts/yt_fetch.sh media <URL> <DIR>` — 영상 1회 다운로드 + 검증된 캐시 재사용 (`.part`/오디오 없는 잔존물 거부, 임시 디렉토리 경유 원자적 배치), `{status, path, cached}` JSON 출력.
+- `scripts/yt_fetch.sh transcribe <FILE|URL> <DIR>` — 자막 체크 없이 바로 Whisper 전사 (Groq → OpenAI fallback) + 기존 산출물 재사용 가드 (`whisper_model:"cached"`).
+- `scripts/yt_fetch.sh captions ... --captions-only` — 자막 부재 시 Whisper 로 넘어가지 않는 교차 검증 전용 모드 (자막 부재 = `status:"ok"` + 빈 `caption_files`). preview 는 플래그 없는 기존 동작 그대로.
+- AV-first 통합 bats 시나리오 (다운로드 1회 + whisper/captions 산출물 분리 검증).
+
+### Changed
+- **youtube-adapter** — 분석 우선순위 반전: frames(시각) + Whisper(오디오) 를 `intent.focus` 무관 **항상** 수행, 자막은 고유명사·숫자·용어 교차 검증용으로 강등 (Whisper 실패 시 자막이 주 전사본으로 승격). 영상 다운로드 2회 → 1회 (`media` 캐시 공유). 산출물은 `$cache_dir` 아래 `media/`·`frames/`·`whisper/`·`captions/` 로 분리 (whisper.vtt 자막 오인 차단). media 실패 시 재다운로드 금지(captions-only fallback). transcript 는 파일 직접 쓰기 대신 `artifacts.transcript_md` 반환. findings `source_type` 에 `youtube-whisper` 구분 추가.
+- `commands/research.md` — youtube-adapter timeout 5분 → 20분 (긴 영상 AV-first 대응).
+- `skills/research-engine/SKILL.md` — preview(자막 우선, 무변경) vs 본 분석(AV-first) 구분 명시.
+
+### Fixed
+- `captions` 가 디렉토리 내 `whisper.vtt` 를 자막으로 오인 카운트하던 잠재 버그 (재실행 시 발생) — vtt 탐지에서 `whisper.vtt` 제외.
+
+## [0.16.0]
+
+### Added
+- YouTube transcript 경로에 OpenAI `whisper-1` fallback + curl retry (Groq 불가 시). (릴리즈 당시 CHANGELOG 누락 — 0.17.0 작업 중 소급 기재.)
+
 ## [0.15.0]
 
 LLM 위키 레이어 + YouTube 프레임 watch + 어댑터 프롬프트 진화 3건 promote.
