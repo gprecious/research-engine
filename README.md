@@ -229,7 +229,7 @@ When Notion is configured, the final stage auto-pushes the patched README back t
 
 ## Requirements
 
-- `yt-dlp` in `PATH` (YouTube captions)
+- `yt-dlp` + `ffmpeg`/`ffprobe` in `PATH` (YouTube AV-first analysis — media download, frame extraction, Whisper audio prep)
 - `gh` CLI authenticated (GitHub)
 - `jq` (JSON munging)
 - `perl` with UTF-8 support (for Unicode-aware slugify; standard on Debian/Ubuntu)
