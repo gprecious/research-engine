@@ -368,3 +368,69 @@ SH
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.transcript_source == "none" and (.caption_files | length == 0)' >/dev/null
 }
+
+@test "AV-first sequence: single download, separated whisper/captions outputs" {
+  ffmpeg -f lavfi -i sine=frequency=1000:duration=2 \
+    -f lavfi -i testsrc=size=320x180:rate=10:duration=2 \
+    -shortest -pix_fmt yuv420p "$TMPDIR_TEST/av.mp4" >/dev/null 2>&1
+
+  mkdir -p "$TMPDIR_TEST/bin"
+  # yt-dlp mock: caption pass(--write-sub)는 자막 없이 종료(카운트 제외),
+  # 다운로드 pass 만 카운트하며 fixture 복사
+  cat > "$TMPDIR_TEST/bin/yt-dlp" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  *--write-sub*) exit 0 ;;
+esac
+count="$(cat "$COUNT_FILE" 2>/dev/null || echo 0)"
+printf '%s' "$((count + 1))" > "$COUNT_FILE"
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+if [ -n "$out" ]; then
+  target="${out/\%(ext)s/mp4}"
+  mkdir -p "$(dirname "$target")"
+  cp "$SRC_FIXTURE" "$target"
+fi
+exit 0
+SH
+  chmod +x "$TMPDIR_TEST/bin/yt-dlp"
+  cat > "$TMPDIR_TEST/bin/curl" <<'SH'
+#!/usr/bin/env bash
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+printf '{"segments":[{"start":0,"end":1.5,"text":"integration hello"}]}' > "$out"
+printf '200'
+SH
+  chmod +x "$TMPDIR_TEST/bin/curl"
+
+  CACHE="$TMPDIR_TEST/yt-cache"
+
+  # 1) media — 다운로드 1회
+  COUNT_FILE="$TMPDIR_TEST/count" SRC_FIXTURE="$TMPDIR_TEST/av.mp4" \
+  PATH="$TMPDIR_TEST/bin:$PATH" \
+  run "$SCRIPT" media "https://youtu.be/example" "$CACHE/media"
+  [ "$status" -eq 0 ]
+  MEDIA_PATH="$(echo "$output" | jq -r '.path')"
+
+  # 2) frames — 로컬 파일 입력 (URL 아님 → yt-dlp 미호출)
+  PATH="$TMPDIR_TEST/bin:$PATH" \
+  run "$SCRIPT" frames "$MEDIA_PATH" "$CACHE/frames" --start 0 --end 2
+  [ "$status" -eq 0 ]
+  [ -s "$CACHE/frames/frames.json" ]
+
+  # 3) transcribe — whisper/ 전용 디렉토리
+  HOME="$TMPDIR_TEST" PATH="$TMPDIR_TEST/bin:$PATH" GROQ_API_KEY="gsk_test" OPENAI_API_KEY="" \
+  run "$SCRIPT" transcribe "$MEDIA_PATH" "$CACHE/whisper"
+  [ "$status" -eq 0 ]
+  [ -s "$CACHE/whisper/whisper.vtt" ]
+
+  # 4) captions --captions-only — captions/ 전용 디렉토리, whisper 산출물과 미혼합
+  COUNT_FILE="$TMPDIR_TEST/count" SRC_FIXTURE="$TMPDIR_TEST/av.mp4" \
+  HOME="$TMPDIR_TEST" PATH="$TMPDIR_TEST/bin:$PATH" \
+  run "$SCRIPT" captions "https://youtu.be/example" "$CACHE/captions" --captions-only
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.transcript_source == "none" and (.caption_files | length == 0)' >/dev/null
+
+  # 영상 다운로드는 전체 시퀀스에서 정확히 1회
+  [ "$(cat "$TMPDIR_TEST/count")" = "1" ]
+}
