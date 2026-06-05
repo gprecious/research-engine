@@ -323,3 +323,48 @@ SH
   echo "$output" | jq -e '.status == "ok" and .transcript_source == "whisper" and .whisper_model == "cached"' >/dev/null
   [ ! -f "$TMPDIR_TEST/curl-args.txt" ]
 }
+
+@test "captions --captions-only skips whisper fallback when captions are absent" {
+  mkdir -p "$TMPDIR_TEST/bin"
+  cat > "$TMPDIR_TEST/bin/yt-dlp" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "$TMPDIR_TEST/bin/yt-dlp"
+  # curl mock: 호출되면 기록 — 이 테스트에서는 호출되지 않아야 함
+  cat > "$TMPDIR_TEST/bin/curl" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$CURL_ARGS_FILE"
+printf '000'
+SH
+  chmod +x "$TMPDIR_TEST/bin/curl"
+
+  # 키를 일부러 설정 — 키 부재가 아니라 플래그가 whisper 를 막는다는 것을 검증
+  HOME="$TMPDIR_TEST" CURL_ARGS_FILE="$TMPDIR_TEST/curl-args.txt" \
+  PATH="$TMPDIR_TEST/bin:$PATH" GROQ_API_KEY="gsk_test" OPENAI_API_KEY="sk_test" \
+  run "$SCRIPT" captions "https://youtu.be/no-caps" "$TMPDIR_TEST/cap" --captions-only
+
+  [ "$status" -eq 0 ]
+  # 교차 검증 모드에서 자막 부재는 실패가 아닌 정상 결과 → status "ok"
+  echo "$output" | jq -e '.status == "ok" and .transcript_source == "none" and (.caption_files | length == 0) and (.failures | length == 0)' >/dev/null
+  [ ! -f "$TMPDIR_TEST/curl-args.txt" ]
+}
+
+@test "captions does not count whisper.vtt as a caption file" {
+  # 같은 디렉토리에 whisper.vtt 가 이미 있어도 자막으로 오인하지 않아야 함 (오염 regression)
+  mkdir -p "$TMPDIR_TEST/cap"
+  printf 'WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nwhisper text\n' > "$TMPDIR_TEST/cap/whisper.vtt"
+
+  mkdir -p "$TMPDIR_TEST/bin"
+  cat > "$TMPDIR_TEST/bin/yt-dlp" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "$TMPDIR_TEST/bin/yt-dlp"
+
+  HOME="$TMPDIR_TEST" PATH="$TMPDIR_TEST/bin:$PATH" GROQ_API_KEY="" OPENAI_API_KEY="" \
+  run "$SCRIPT" captions "https://youtu.be/no-caps" "$TMPDIR_TEST/cap" --captions-only
+
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.transcript_source == "none" and (.caption_files | length == 0)' >/dev/null
+}

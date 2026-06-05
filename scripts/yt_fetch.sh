@@ -4,7 +4,11 @@
 # Subcommands:
 #   metadata <URL>                       — prints JSON with selected caption lang
 #   metadata --from-fixture <PATH>       — same, but reads a local JSON dump (for tests)
-#   captions <URL> <DIR>                 — downloads captions, falls back to Groq Whisper when absent
+#   media <URL> <DIR>                    — downloads the video once, prints {status, path, cached}
+#   transcribe <FILE|URL> <DIR>          — Whisper transcription directly (no caption check)
+#   captions <URL> <DIR> [--captions-only]
+#                                         — downloads captions; falls back to Groq Whisper when
+#                                           absent unless --captions-only is given
 #   frames <URL|FILE> <DIR> [--start S] [--end E]
 #                                         — extracts sampled JPEG frames + frames.json
 #
@@ -343,10 +347,19 @@ case "${1:-}" in
     ;;
 
   captions)
-    [[ $# -eq 3 ]] || die "captions needs <URL> <DIR>"
-    url="$2"; dir="$3"
+    shift
+    captions_only=false
+    positional=()
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --captions-only) captions_only=true; shift ;;
+        *) positional+=("$1"); shift ;;
+      esac
+    done
+    [[ ${#positional[@]} -eq 2 ]] || die "captions needs <URL> <DIR> [--captions-only]"
+    url="${positional[0]}"; dir="${positional[1]}"
     mkdir -p "$dir"
-    before_count="$(find "$dir" -maxdepth 1 -type f -name '*.vtt' | wc -l | tr -d ' ')"
+    before_count="$(find "$dir" -maxdepth 1 -type f -name '*.vtt' ! -name 'whisper.vtt' | wc -l | tr -d ' ')"
     # Download all available subs and auto-captions (orchestrator will pick).
     yt_dlp_capture_with_recovery \
       --ignore-no-formats-error \
@@ -357,15 +370,20 @@ case "${1:-}" in
       --convert-subs "vtt" \
       -o "$dir/%(id)s.%(ext)s" \
       "$url" >/dev/null 2>"$dir/captions.stderr" || true
-    after_count="$(find "$dir" -maxdepth 1 -type f -name '*.vtt' | wc -l | tr -d ' ')"
+    after_count="$(find "$dir" -maxdepth 1 -type f -name '*.vtt' ! -name 'whisper.vtt' | wc -l | tr -d ' ')"
     if [[ "$after_count" -gt "$before_count" || "$after_count" -gt 0 ]]; then
-      mapfile -t vtts < <(find "$dir" -maxdepth 1 -type f -name '*.vtt' | sort)
+      mapfile -t vtts < <(find "$dir" -maxdepth 1 -type f -name '*.vtt' ! -name 'whisper.vtt' | sort)
       printf '%s\n' "${vtts[@]}" | jq -R -s '
         split("\n") | map(select(length > 0)) as $files
         | {status:"ok", transcript_source:"captions", caption_files:$files, failures:[]}
       '
     else
-      whisper_fallback "$url" "$dir"
+      if [[ "$captions_only" == true ]]; then
+        # 교차 검증 전용 모드: 자막 부재는 실패가 아닌 정상 결과
+        jq -n '{status:"ok", transcript_source:"none", caption_files:[], failures:[]}'
+      else
+        whisper_fallback "$url" "$dir"
+      fi
     fi
     ;;
 
@@ -433,7 +451,7 @@ case "${1:-}" in
     ;;
 
   ""|-h|--help)
-    sed -n '2,10p' "$0"
+    sed -n '2,13p' "$0"
     exit 1
     ;;
 
