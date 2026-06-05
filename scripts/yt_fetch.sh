@@ -304,6 +304,33 @@ case "${1:-}" in
       '. + {selected_caption_lang: $lang, caption_langs_available: $langs}'
     ;;
 
+  media)
+    [[ $# -eq 3 ]] || die "media needs <URL> <DIR>"
+    url="$2"; dir="$3"
+    command -v ffprobe >/dev/null || die "ffprobe not installed"
+    mkdir -p "$dir"
+    # 캐시 후보: .part(중단된 다운로드) 제외, find -print -quit 로 pipefail-안전하게 1개만
+    existing="$(find "$dir" -maxdepth 1 -type f \( -name 'video.*' -o -name '*.mp4' -o -name '*.mkv' -o -name '*.webm' \) ! -name '*.part' -print -quit)"
+    if [[ -n "$existing" ]]; then
+      if ffprobe -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 "$existing" 2>/dev/null | grep -q audio; then
+        jq -n --arg path "$(abs_path "$existing")" '{status:"ok", path:$path, cached:true}'
+        exit 0
+      fi
+      rm -f "$existing"   # 오디오 스트림 없음(병합 전 잔존물 등) — 깨진 캐시 제거 후 재다운로드
+    fi
+    # 임시 디렉토리에 받고 완료 후 move — 중단된 다운로드가 캐시 후보로 보이지 않게
+    tmp_dir="$dir/.dl-tmp"
+    rm -rf "$tmp_dir"; mkdir -p "$tmp_dir"
+    if ! media_path="$(download_video "$url" "$tmp_dir")"; then
+      die "media download failed: $url"
+    fi
+    [[ -n "$media_path" && -f "$media_path" ]] || die "media download failed: $url"
+    final="$dir/$(basename "$media_path")"
+    mv -f "$media_path" "$final"
+    rm -rf "$tmp_dir"
+    jq -n --arg path "$(abs_path "$final")" '{status:"ok", path:$path, cached:false}'
+    ;;
+
   captions)
     [[ $# -eq 3 ]] || die "captions needs <URL> <DIR>"
     url="$2"; dir="$3"

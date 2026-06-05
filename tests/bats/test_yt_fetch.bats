@@ -175,3 +175,82 @@ SH
   grep -q "groq.com" "$TMPDIR_TEST/curl-args.txt"
   grep -q "openai.com" "$TMPDIR_TEST/curl-args.txt"
 }
+
+@test "media subcommand downloads once and reuses cached file on second call" {
+  # 캐시 재사용 검증은 ffprobe 오디오 스트림 체크를 통과해야 하므로 실제 AV fixture 사용
+  ffmpeg -f lavfi -i sine=frequency=1000:duration=1 \
+    -f lavfi -i testsrc=size=320x180:rate=10:duration=1 \
+    -shortest -pix_fmt yuv420p "$TMPDIR_TEST/src.mp4" >/dev/null 2>&1
+
+  mkdir -p "$TMPDIR_TEST/bin"
+  # yt-dlp mock: 호출 횟수를 기록하고, -o 타깃 위치에 fixture 를 복사
+  cat > "$TMPDIR_TEST/bin/yt-dlp" <<'SH'
+#!/usr/bin/env bash
+count="$(cat "$COUNT_FILE" 2>/dev/null || echo 0)"
+printf '%s' "$((count + 1))" > "$COUNT_FILE"
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+if [ -n "$out" ]; then
+  target="${out/\%(ext)s/mp4}"
+  mkdir -p "$(dirname "$target")"
+  cp "$SRC_FIXTURE" "$target"
+fi
+exit 0
+SH
+  chmod +x "$TMPDIR_TEST/bin/yt-dlp"
+
+  COUNT_FILE="$TMPDIR_TEST/count" SRC_FIXTURE="$TMPDIR_TEST/src.mp4" \
+  PATH="$TMPDIR_TEST/bin:$PATH" \
+  run "$SCRIPT" media "https://youtu.be/example" "$TMPDIR_TEST/media"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.status == "ok" and .cached == false and (.path | endswith(".mp4"))' >/dev/null
+  [ -s "$(echo "$output" | jq -r '.path')" ]
+
+  # 두 번째 호출: 캐시 재사용 — yt-dlp 가 다시 호출되지 않아야 함
+  COUNT_FILE="$TMPDIR_TEST/count" SRC_FIXTURE="$TMPDIR_TEST/src.mp4" \
+  PATH="$TMPDIR_TEST/bin:$PATH" \
+  run "$SCRIPT" media "https://youtu.be/example" "$TMPDIR_TEST/media"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.status == "ok" and .cached == true' >/dev/null
+  [ "$(cat "$TMPDIR_TEST/count")" = "1" ]
+}
+
+@test "media subcommand rejects .part and audio-less files as cache" {
+  # 깨진 캐시 후보를 미리 배치: 오디오 없는 video-only 파일 + 중단된 .part
+  ffmpeg -f lavfi -i testsrc=size=320x180:rate=10 -t 1 \
+    -pix_fmt yuv420p "$TMPDIR_TEST/videoonly.mp4" >/dev/null 2>&1
+  mkdir -p "$TMPDIR_TEST/media"
+  cp "$TMPDIR_TEST/videoonly.mp4" "$TMPDIR_TEST/media/video.mp4"
+  printf 'partial-bytes' > "$TMPDIR_TEST/media/video.mp4.part"
+
+  # 정상 AV fixture + mock yt-dlp (위 테스트와 동일 mock)
+  ffmpeg -f lavfi -i sine=frequency=1000:duration=1 \
+    -f lavfi -i testsrc=size=320x180:rate=10:duration=1 \
+    -shortest -pix_fmt yuv420p "$TMPDIR_TEST/src.mp4" >/dev/null 2>&1
+  mkdir -p "$TMPDIR_TEST/bin"
+  cat > "$TMPDIR_TEST/bin/yt-dlp" <<'SH'
+#!/usr/bin/env bash
+count="$(cat "$COUNT_FILE" 2>/dev/null || echo 0)"
+printf '%s' "$((count + 1))" > "$COUNT_FILE"
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+if [ -n "$out" ]; then
+  target="${out/\%(ext)s/mp4}"
+  mkdir -p "$(dirname "$target")"
+  cp "$SRC_FIXTURE" "$target"
+fi
+exit 0
+SH
+  chmod +x "$TMPDIR_TEST/bin/yt-dlp"
+
+  COUNT_FILE="$TMPDIR_TEST/count" SRC_FIXTURE="$TMPDIR_TEST/src.mp4" \
+  PATH="$TMPDIR_TEST/bin:$PATH" \
+  run "$SCRIPT" media "https://youtu.be/example" "$TMPDIR_TEST/media"
+  [ "$status" -eq 0 ]
+  # 오디오 없는 캐시 후보는 거부되고 재다운로드 (cached:false, yt-dlp 1회)
+  echo "$output" | jq -e '.status == "ok" and .cached == false' >/dev/null
+  [ "$(cat "$TMPDIR_TEST/count")" = "1" ]
+  # 결과 파일은 오디오 스트림 보유
+  ffprobe -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 \
+    "$(echo "$output" | jq -r '.path')" | grep -q audio
+}
