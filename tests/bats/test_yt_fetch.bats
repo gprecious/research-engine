@@ -254,3 +254,72 @@ SH
   ffprobe -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 \
     "$(echo "$output" | jq -r '.path')" | grep -q audio
 }
+
+@test "transcribe subcommand runs Whisper directly on a local media file" {
+  # 오디오 트랙이 있는 로컬 미디어 → extract_audio 가 audio.mp3 생성 가능해야 함
+  ffmpeg -f lavfi -i sine=frequency=1000:duration=2 \
+    -f lavfi -i testsrc=size=320x180:rate=10:duration=2 \
+    -shortest -pix_fmt yuv420p "$TMPDIR_TEST/av.mp4" >/dev/null 2>&1
+
+  mkdir -p "$TMPDIR_TEST/bin"
+  # curl mock: Groq 엔드포인트가 200 + segments 반환
+  cat > "$TMPDIR_TEST/bin/curl" <<'SH'
+#!/usr/bin/env bash
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+printf '{"segments":[{"start":0,"end":1.5,"text":"hello av-first"}]}' > "$out"
+printf '200'
+SH
+  chmod +x "$TMPDIR_TEST/bin/curl"
+
+  HOME="$TMPDIR_TEST" \
+  PATH="$TMPDIR_TEST/bin:$PATH" GROQ_API_KEY="gsk_test" OPENAI_API_KEY="" \
+  run "$SCRIPT" transcribe "$TMPDIR_TEST/av.mp4" "$TMPDIR_TEST/tr"
+
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.status == "ok" and .transcript_source == "whisper" and (.whisper_model | test("groq"))' >/dev/null
+  [ -s "$TMPDIR_TEST/tr/whisper.vtt" ]
+  grep -q "hello av-first" "$TMPDIR_TEST/tr/whisper.vtt"
+}
+
+@test "transcribe subcommand reports partial when no whisper keys configured" {
+  printf 'x' > "$TMPDIR_TEST/fake.mp4"
+  # HOME 격리로 ~/.config/research-engine/*.env 키 누출 차단
+  HOME="$TMPDIR_TEST" GROQ_API_KEY="" OPENAI_API_KEY="" \
+  run "$SCRIPT" transcribe "$TMPDIR_TEST/fake.mp4" "$TMPDIR_TEST/tr"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.status == "partial" and .transcript_source == "none" and (.failures[]?.step == "whisper")' >/dev/null
+}
+
+@test "transcribe reuses existing whisper output without calling the API" {
+  ffmpeg -f lavfi -i sine=frequency=1000:duration=2 \
+    -f lavfi -i testsrc=size=320x180:rate=10:duration=2 \
+    -shortest -pix_fmt yuv420p "$TMPDIR_TEST/av.mp4" >/dev/null 2>&1
+
+  mkdir -p "$TMPDIR_TEST/bin"
+  cat > "$TMPDIR_TEST/bin/curl" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$CURL_ARGS_FILE"
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+printf '{"segments":[{"start":0,"end":1.5,"text":"first run"}]}' > "$out"
+printf '200'
+SH
+  chmod +x "$TMPDIR_TEST/bin/curl"
+
+  # 1차: API 호출로 whisper.vtt/json 생성
+  HOME="$TMPDIR_TEST" CURL_ARGS_FILE="$TMPDIR_TEST/curl-args.txt" \
+  PATH="$TMPDIR_TEST/bin:$PATH" GROQ_API_KEY="gsk_test" OPENAI_API_KEY="" \
+  run "$SCRIPT" transcribe "$TMPDIR_TEST/av.mp4" "$TMPDIR_TEST/tr"
+  [ "$status" -eq 0 ]
+  [ -s "$TMPDIR_TEST/curl-args.txt" ]
+
+  # 2차: 기존 산출물 재사용 — curl 미호출, whisper_model == "cached"
+  rm -f "$TMPDIR_TEST/curl-args.txt"
+  HOME="$TMPDIR_TEST" CURL_ARGS_FILE="$TMPDIR_TEST/curl-args.txt" \
+  PATH="$TMPDIR_TEST/bin:$PATH" GROQ_API_KEY="gsk_test" OPENAI_API_KEY="" \
+  run "$SCRIPT" transcribe "$TMPDIR_TEST/av.mp4" "$TMPDIR_TEST/tr"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.status == "ok" and .transcript_source == "whisper" and .whisper_model == "cached"' >/dev/null
+  [ ! -f "$TMPDIR_TEST/curl-args.txt" ]
+}

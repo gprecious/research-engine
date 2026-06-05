@@ -226,6 +226,12 @@ whisper_request() {
 whisper_fallback() {
   local input="$1" dir="$2"
   mkdir -p "$dir"
+  # 재사용 가드: 이전 실행의 whisper 산출물이 있으면 API 호출 없이 반환 (비용 중복 방지)
+  if [[ -s "$dir/whisper.vtt" && -s "$dir/whisper.json" ]]; then
+    jq -n --arg vtt "$dir/whisper.vtt" --arg json "$dir/whisper.json" \
+      '{status:"ok", transcript_source:"whisper", whisper_model:"cached", transcript_vtt:$vtt, transcript_json:$json, failures:[]}'
+    return 0
+  fi
   local groq_key openai_key
   groq_key="$(load_groq_key || true)"
   openai_key="$(load_openai_key || true)"
@@ -329,6 +335,11 @@ case "${1:-}" in
     mv -f "$media_path" "$final"
     rm -rf "$tmp_dir"
     jq -n --arg path "$(abs_path "$final")" '{status:"ok", path:$path, cached:false}'
+    ;;
+
+  transcribe)
+    [[ $# -eq 3 ]] || die "transcribe needs <FILE|URL> <DIR>"
+    whisper_fallback "$2" "$3"
     ;;
 
   captions)
