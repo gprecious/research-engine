@@ -5,6 +5,16 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
 ## [Unreleased]
 
+## [0.18.2]
+
+`/evolve youtube-adapter` — `findings-guidance` 영역 v1→v2 승격(non-bench). dream `drm_2026-06-09-1005-ai-agent-tooling` 의 `pattern-adapter-failure-modes` #2(Whisper 키 부재 시 캡션이 primary 로 조용히 승격되어 AV 교차검증이 누락됐으나 success 로 기록됨) 대응.
+
+bench 스킵 사유: 이 가드는 **degraded(caption-only) 조건에서만 발동**하는 정직성 규율인데, 이 머신은 0.18.1 로컬 whisper.cpp 로 bench 영상(`youtube-3blue1brown-gpt`)에서 항상 Whisper 가 성공 → 캡션 전용 분기가 트리거되지 않아 통계 gate 가 구조적으로 hold(차이 0)를 반환, candidate 를 폐기하게 됨. coverage 위주 LLM-judge 로는 source_type 정직성을 측정할 수 없어 대신 정확성 교정으로 직접 promote.
+
+### Changed
+- `agents/youtube-adapter.md` — `findings-guidance` 영역: primary transcript 가 Whisper/오디오 부재로 caption-only 인 구간의 finding 은 반드시 `source_type: "youtube-captions"` 로 강제(`youtube-whisper`/`youtube-frame` 금지), 음성/영상 검증된 것처럼 표현 금지 → 캡션 전용 fallback 이 실제 coverage gap 신호로 findings 에 드러남.
+- `research/_index/evolve-ledger.json` — youtube-adapter v2 엔트리(`promotion: "non-bench"`, metrics 는 재측정 없이 v1 승계, `ci_lower: null`). v1 은 `agents/archive/youtube-adapter.v1.md` 로 보존.
+
 ## [0.18.1]
 
 로컬 Whisper 백엔드에 **whisper.cpp** 추가 — Python/torch 스택 없이(mlx-whisper 는 torch 하드 의존으로 venv ~891MB) 이미 설치된 `whisper-cli` 바이너리로 온디바이스 전사. 디스크 부담이 모델 파일(예: ggml-large-v3-turbo-q5_0 ~547MB)뿐. 실측: 13.6분 WWDC 영상을 M-series 에서 ~34초·키 없이 143세그먼트 전사.

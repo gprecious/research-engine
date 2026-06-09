@@ -2,8 +2,8 @@
   "version": 1,
   "adapters": {
     "youtube-adapter": {
-      "current_version": 1,
-      "promoted_at": "2026-05-25T14:51:24.450Z",
+      "current_version": 2,
+      "promoted_at": "2026-06-09T06:42:03.739Z",
       "history": [
         {
           "version": 1,
@@ -15,6 +15,19 @@
             "latency_inv": 0
           },
           "promoted_at": "2026-05-25T14:51:24.450Z"
+        },
+        {
+          "version": 2,
+          "ci_lower": null,
+          "metrics": {
+            "judge_score": 34.5,
+            "source_count": 1,
+            "type_diversity": 1,
+            "latency_inv": 0
+          },
+          "promoted_at": "2026-06-09T06:42:03.739Z",
+          "promotion": "non-bench",
+          "note": "caption-only source_type honesty guard — bench cannot measure (local whisper always succeeds on bench topic → degraded-condition guard never triggers). Driver: dream drm_2026-06-09-1005-ai-agent-tooling pattern-adapter-failure-modes #2 (caption fallback silently promoted to primary, AV cross-check skipped, logged as success)."
         }
       ],
       "frontier": [
@@ -28,6 +41,19 @@
             "latency_inv": 0
           },
           "promoted_at": "2026-05-25T14:51:24.450Z"
+        },
+        {
+          "version": 2,
+          "ci_lower": null,
+          "metrics": {
+            "judge_score": 34.5,
+            "source_count": 1,
+            "type_diversity": 1,
+            "latency_inv": 0
+          },
+          "promoted_at": "2026-06-09T06:42:03.739Z",
+          "promotion": "non-bench",
+          "note": "caption-only source_type honesty guard — bench cannot measure (local whisper always succeeds on bench topic → degraded-condition guard never triggers). Driver: dream drm_2026-06-09-1005-ai-agent-tooling pattern-adapter-failure-modes #2 (caption fallback silently promoted to primary, AV cross-check skipped, logged as success)."
         }
       ],
       "rejected": []
