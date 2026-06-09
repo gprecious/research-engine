@@ -171,7 +171,32 @@ If suggest = true, the `--suggest?` CLI also writes `suggestion_shown_at` back t
 
 > 💡 dream-ledger: 마지막 dream 이후 {N}개 세션이 누적되었습니다. `/dream` 으로 패턴 인사이트를 추출할 수 있어요.
 
-8. Final message to user: one line with `<report_dir>/README.md` path + Notion URL (if pushed) + a 2-line TL;DR preview.
+**Step 7.6 — Auto-ingest into the LLM Wiki**
+
+Fold this session into the durable LLM wiki immediately, so a research run never lives only as a raw `research/<slug>/` artifact. This runs **automatically** at the end of every `/research`; it is a silent no-op when no wiki vault is configured, and can be disabled with `WIKI_AUTO_INGEST=0`.
+
+1. Resolve + (idempotently) bootstrap the wiki vault:
+   ```bash
+   [ "${WIKI_AUTO_INGEST:-1}" = "0" ] && { echo "wiki auto-ingest disabled (WIKI_AUTO_INGEST=0)"; }
+   node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/vault_resolve.mjs" --explain   # inspect "ok"
+   VAULT="$(node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/vault_resolve.mjs")"
+   ```
+   - If `WIKI_AUTO_INGEST=0`, **skip this whole step** (log one line).
+   - If the `--explain` JSON shows `"ok": false` (no vault resolved — neither `WIKI_VAULT` nor a registered `LLM_OBSIDIAN_VAULT_NAME`), **skip silently** (log: `wiki auto-ingest skipped — no vault`). Never fail the research run because of the wiki step.
+   - Otherwise bootstrap:
+     ```bash
+     mkdir -p "${VAULT}/concepts" "${VAULT}/entities" "${VAULT}/synthesis" "${VAULT}/ephemeral" "${VAULT}/_drafts" "${VAULT}/_todos" "${VAULT}/_index"
+     [ -f "${VAULT}/AGENTS.md" ] || cp "${CLAUDE_PLUGIN_ROOT}/lib/wiki/AGENTS.template.md" "${VAULT}/AGENTS.md"
+     [ -f "${VAULT}/index.md" ] || printf '# Wiki Index\n' > "${VAULT}/index.md"
+     ```
+2. Ingest **this session's `<slug>`** by following `commands/wiki.md` → **Action: ingest → "단일 slug 절차"** exactly (read `research/<slug>/README.md` + `sources.json` + `${VAULT}/index.md` + `${VAULT}/AGENTS.md`; extract entities/concepts per the constitution into a single `${VAULT}/_index/plan-<slug>.json`; then single deterministic apply):
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/apply.mjs" --vault "${VAULT}" --plan "${VAULT}/_index/plan-<slug>.json" --date <today>
+   ```
+   - The `log.md` exact-match dedup guard from wiki.md applies, so re-running `/research` for the same slug is a no-op (no duplicate pages).
+3. Capture the apply result (created/merged counts) for the final message. On any error in this step, log it and continue — the research artifacts are already persisted.
+
+8. Final message to user: one line with `<report_dir>/README.md` path + Notion URL (if pushed) + a 2-line TL;DR preview. If Step 7.6 ran, append one line: `📚 LLM Wiki: {created}개 생성 / {merged}개 병합 → {VAULT}` (or `wiki: skipped` when no vault).
 
 ## Cache policy
 

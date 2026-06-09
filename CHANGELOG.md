@@ -5,6 +5,15 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
 ## [Unreleased]
 
+## [0.19.0]
+
+`/research` 가 끝나면 **자동으로 LLM 위키에 ingest** — 리서치 결과가 raw `research/<slug>/` 로만 남지 않고 즉시 harry 등 Obsidian 위키(`LLM-Wiki/`)로 합성된다.
+
+### Added
+- `commands/research.md` — Stage 5 에 **Step 7.6 (Auto-ingest into the LLM Wiki)** 추가. Notion 미러(step 7)·dream-ledger(step 7.5) 직후 실행. `vault_resolve.mjs` 로 vault 해석 → 부트스트랩 → 해당 `<slug>` 를 `commands/wiki.md` 의 단일-slug ingest 절차대로 합성 후 `apply.mjs`. `log.md` exact-match dedup 가드로 동일 slug 재실행은 no-op.
+- 가드: vault 미해석(`ok:false`) 또는 `WIKI_AUTO_INGEST=0` 이면 조용히 skip. 위키 단계 오류는 리서치 산출물에 영향 주지 않음(절대 abort 안 함).
+- vault 타게팅: `WIKI_VAULT`(절대) > `LLM_OBSIDIAN_VAULT_NAME`(+`LLM_WIKI_SUBDIR`, 기본 `LLM-Wiki`) — 기존 `vault_resolve.mjs` 정책 그대로. 동일 이름 vault 가 여러 개면 `WIKI_VAULT` 절대경로 핀 권장(split-brain 회피).
+
 ## [0.18.2]
 
 `/evolve youtube-adapter` — `findings-guidance` 영역 v1→v2 승격(non-bench). dream `drm_2026-06-09-1005-ai-agent-tooling` 의 `pattern-adapter-failure-modes` #2(Whisper 키 부재 시 캡션이 primary 로 조용히 승격되어 AV 교차검증이 누락됐으나 success 로 기록됨) 대응.
