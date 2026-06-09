@@ -5,6 +5,20 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
 ## [Unreleased]
 
+## [0.18.1]
+
+로컬 Whisper 백엔드에 **whisper.cpp** 추가 — Python/torch 스택 없이(mlx-whisper 는 torch 하드 의존으로 venv ~891MB) 이미 설치된 `whisper-cli` 바이너리로 온디바이스 전사. 디스크 부담이 모델 파일(예: ggml-large-v3-turbo-q5_0 ~547MB)뿐. 실측: 13.6분 WWDC 영상을 M-series 에서 ~34초·키 없이 143세그먼트 전사.
+
+### Added
+- `scripts/yt_fetch.sh` — `whisper.cpp`(`whisper-cli`) 백엔드. mp3 직접 입력, `whisper.cpp` JSON(`transcription[].offsets` ms)을 verbose_json(`segments[].start/end`)으로 변환해 기존 파이프라인 통과.
+- 모델 자동 탐색: `RESEARCH_ENGINE_WHISPER_CPP_MODEL`(명시 경로) → `~/.config/research-engine/whisper-models/ggml-*.bin`(turbo/large 우선).
+- Python 백엔드 인터프리터 해석 `resolve_whisper_python()`: `RESEARCH_ENGINE_PYTHON` → 관용 venv(`~/.config/research-engine/whisper-venv`) → `python3`. 시스템 python 오염 없이 격리 venv 사용 가능.
+- 노브: `RESEARCH_ENGINE_WHISPER_DISABLE_CPP=1`(whisper.cpp 건너뛰기).
+- bats: whisper.cpp 스텁 전사 테스트 추가, Python 스텁 테스트는 cpp off + interpreter 고정으로 격리.
+
+### Changed
+- `whisper_local()` 백엔드 우선순위: **whisper.cpp → mlx-whisper → openai-whisper → (cloud) Groq → OpenAI**. 백엔드 부재 메시지가 whisper.cpp/mlx 설치를 우선 안내.
+
 ## [0.18.0]
 
 Obsidian-backed LLM Wiki librarian release. `/wiki` now resolves a single global vault, tags generated pages, maintains safe fixes automatically, drafts risky synthesis/schema output, promotes approved drafts, and publishes only verified live content.

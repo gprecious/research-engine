@@ -9,8 +9,8 @@
 #   captions <URL> <DIR> [--captions-only]
 #                                         — downloads captions; falls back to Whisper when
 #                                           absent unless --captions-only is given. Whisper
-#                                           order: local (mlx-whisper/openai-whisper, no key)
-#                                           → Groq → OpenAI.
+#                                           order: local (whisper.cpp / mlx-whisper /
+#                                           openai-whisper, no key) → Groq → OpenAI.
 #   frames <URL|FILE> <DIR> [--start S] [--end E]
 #                                         — extracts sampled JPEG frames + frames.json
 #
@@ -208,17 +208,55 @@ emit_whisper_ok() {
 }
 
 # Local, key-free transcription. Whisper does NOT require a cloud key — this runs the
-# model on-device. Apple Silicon: mlx-whisper (preferred); otherwise openai-whisper.
-# Override the model via RESEARCH_ENGINE_WHISPER_MODEL (mlx HF repo) /
-# RESEARCH_ENGINE_WHISPER_OPENAI_MODEL (openai-whisper name); disable entirely with
-# RESEARCH_ENGINE_WHISPER_DISABLE_LOCAL=1.
+# model on-device. Backends, in priority order:
+#   1. whisper.cpp (`whisper-cli`) — lightweight C++ binary, accepts mp3 directly, needs a
+#      ggml model file. Preferred when present: no Python/torch stack.
+#   2. mlx-whisper (Apple Silicon) / openai-whisper — Python; mlx auto-downloads the model.
+#
+# Knobs:
+#   RESEARCH_ENGINE_WHISPER_DISABLE_LOCAL=1   disable all local backends
+#   RESEARCH_ENGINE_WHISPER_DISABLE_CPP=1     skip whisper.cpp (use Python only)
+#   RESEARCH_ENGINE_WHISPER_CPP_MODEL=<path>  explicit ggml model file for whisper.cpp
+#   RESEARCH_ENGINE_WHISPER_MODEL=<hf repo>   mlx model (default below)
+#   RESEARCH_ENGINE_WHISPER_OPENAI_MODEL=<n>  openai-whisper model name (default turbo)
+#   RESEARCH_ENGINE_PYTHON=<python>           interpreter for the Python backends
 WHISPER_LOCAL_MODEL_DEFAULT="mlx-community/whisper-large-v3-turbo"
+WHISPER_CPP_MODEL_DIR_DEFAULT="$HOME/.config/research-engine/whisper-models"
 
-# Returns 0 if a local backend can be used (python3 + mlx_whisper or whisper importable).
+# Resolves the Python interpreter for the mlx/openai backends:
+#   RESEARCH_ENGINE_PYTHON → conventional research-engine venv → python3.
+resolve_whisper_python() {
+  if [[ -n "${RESEARCH_ENGINE_PYTHON:-}" ]]; then
+    printf '%s' "${RESEARCH_ENGINE_PYTHON}"; return 0
+  fi
+  local venv_py="$HOME/.config/research-engine/whisper-venv/bin/python"
+  [[ -x "$venv_py" ]] && { printf '%s' "$venv_py"; return 0; }
+  command -v python3 >/dev/null 2>&1 && { printf 'python3'; return 0; }
+  return 1
+}
+
+# Resolves a whisper.cpp ggml model file: explicit env → newest ggml-*.bin in the
+# conventional model dir (turbo/large preferred). Non-zero if none found.
+resolve_whisper_cpp_model() {
+  if [[ -n "${RESEARCH_ENGINE_WHISPER_CPP_MODEL:-}" && -f "${RESEARCH_ENGINE_WHISPER_CPP_MODEL}" ]]; then
+    printf '%s' "${RESEARCH_ENGINE_WHISPER_CPP_MODEL}"; return 0
+  fi
+  local d="${RESEARCH_ENGINE_WHISPER_CPP_MODEL_DIR:-$WHISPER_CPP_MODEL_DIR_DEFAULT}" m
+  for m in "$d"/ggml-large-v3-turbo*.bin "$d"/ggml-large*.bin "$d"/ggml-*.bin; do
+    [[ -f "$m" ]] && { printf '%s' "$m"; return 0; }
+  done
+  return 1
+}
+
+# Returns 0 if any local backend can be used (whisper.cpp w/ model, or a Python module).
 whisper_local_available() {
   [[ "${RESEARCH_ENGINE_WHISPER_DISABLE_LOCAL:-0}" == "1" ]] && return 1
-  command -v python3 >/dev/null 2>&1 || return 1
-  python3 - <<'PY' 2>/dev/null
+  if [[ "${RESEARCH_ENGINE_WHISPER_DISABLE_CPP:-0}" != "1" ]] \
+     && command -v whisper-cli >/dev/null 2>&1 && resolve_whisper_cpp_model >/dev/null 2>&1; then
+    return 0
+  fi
+  local py; py="$(resolve_whisper_python)" || return 1
+  "$py" - <<'PY' 2>/dev/null
 import importlib.util, sys
 sys.exit(0 if (importlib.util.find_spec("mlx_whisper") or importlib.util.find_spec("whisper")) else 1)
 PY
@@ -229,9 +267,29 @@ PY
 # on success; non-zero exit on failure (caller falls through to cloud providers).
 whisper_local() {
   local audio="$1" out="$2"
+  # 1) whisper.cpp — light, no Python, reads mp3 directly.
+  if [[ "${RESEARCH_ENGINE_WHISPER_DISABLE_CPP:-0}" != "1" ]] && command -v whisper-cli >/dev/null 2>&1; then
+    local model
+    if model="$(resolve_whisper_cpp_model)"; then
+      local base="$out.cpp"
+      if whisper-cli -m "$model" -f "$audio" -oj -of "$base" -l auto >/dev/null 2>&1 \
+         && [[ -f "$base.json" ]] \
+         && jq '{text: ([.transcription[].text] | add // ""),
+                 language: (.result.language // ""),
+                 segments: [.transcription[] | {start: (.offsets.from / 1000),
+                                                 end: (.offsets.to / 1000), text: .text}]}' \
+              "$base.json" > "$out" 2>/dev/null \
+         && jq -e '.segments and (.segments | length > 0)' "$out" >/dev/null 2>&1; then
+        printf 'whisper.cpp:%s' "$(basename "$model")"
+        return 0
+      fi
+    fi
+  fi
+  # 2) Python backends: mlx-whisper (preferred) → openai-whisper.
+  local py; py="$(resolve_whisper_python)" || return 1
   local mlx_model="${RESEARCH_ENGINE_WHISPER_MODEL:-${WHISPER_LOCAL_MODEL:-$WHISPER_LOCAL_MODEL_DEFAULT}}"
   local openai_model="${RESEARCH_ENGINE_WHISPER_OPENAI_MODEL:-turbo}"
-  python3 - "$audio" "$out" "$mlx_model" "$openai_model" <<'PY'
+  "$py" - "$audio" "$out" "$mlx_model" "$openai_model" <<'PY'
 import sys, json, importlib.util
 audio, out, mlx_model, openai_model = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 result, backend, errs = None, None, []
@@ -297,7 +355,7 @@ whisper_fallback() {
   if whisper_local_available; then have_local=1; fi
   # 사용 가능한 백엔드가 하나도 없을 때만 실패 — 로컬 설치 안내를 우선한다 (로컬 우선 원칙).
   if [[ "$have_local" -eq 0 && -z "$groq_key" && -z "$openai_key" ]]; then
-    jq -n '{status:"partial", transcript_source:"none", failures:[{step:"whisper", error:"no whisper backend available — install a local one (Apple Silicon: pip install mlx-whisper) or set GROQ_API_KEY / OPENAI_API_KEY"}]}'
+    jq -n '{status:"partial", transcript_source:"none", failures:[{step:"whisper", error:"no whisper backend available — install whisper.cpp (brew install whisper-cpp + a ggml model in ~/.config/research-engine/whisper-models) or mlx-whisper, or set GROQ_API_KEY / OPENAI_API_KEY"}]}'
     return 0
   fi
   if ! extract_audio "$input" "$dir"; then
