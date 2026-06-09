@@ -191,6 +191,91 @@ EOF
   echo "$output" | jq -e '.skipped[0].reason == "already-live"'
 }
 
+@test "dream --target=wiki deterministic outputs" {
+  grep -q -- '--target=wiki' "${REPO_ROOT}/commands/dream.md"
+
+  mkdir -p "${VAULT}/concepts" "${VAULT}/entities"
+  cat > "${VAULT}/concepts/router.md" <<'EOF'
+---
+type: concept
+title: Router
+slug: router
+aliases: []
+sources: [research/a]
+related: []
+tags: [ai-generated, llm-wiki, concept]
+confidence: medium
+created: 2026-06-01
+updated: 2026-06-01
+---
+
+## TL;DR
+라우터 요약
+EOF
+  cat > "${VAULT}/entities/model-x.md" <<'EOF'
+---
+type: entity
+title: Model X
+slug: model-x
+aliases: []
+sources: [research/b]
+related: []
+tags: [ai-generated, llm-wiki, entity]
+confidence: medium
+created: 2026-06-01
+updated: 2026-06-01
+---
+
+## TL;DR
+모델 요약
+EOF
+  cat > "${TMP}/dream-wiki.json" <<'EOF'
+{
+  "synthesis": {
+    "slug": "routing-constraints",
+    "title": "Routing Constraints",
+    "summary": "라우팅 제약은 반복된다.",
+    "evidenceSlugs": ["router", "model-x"],
+    "sources": ["research/a", "research/b"]
+  },
+  "todo": {
+    "slug": "routing-gap",
+    "title": "Routing Gap",
+    "question": "라우팅 제약을 더 조사할까?"
+  }
+}
+EOF
+  run node "${REPO_ROOT}/lib/wiki/wiki_dream.mjs" --vault "${VAULT}" --apply "${TMP}/dream-wiki.json" --date 2026-06-09
+  [ "$status" -eq 0 ]
+  [ -f "${VAULT}/_drafts/synthesis/routing-constraints.md" ]
+  grep -q 'type: synthesis' "${VAULT}/_drafts/synthesis/routing-constraints.md"
+  grep -q 'ai-generated' "${VAULT}/_drafts/synthesis/routing-constraints.md"
+  [ -f "${VAULT}/_todos/routing-gap.md" ]
+  jq -e '.runs[0].synthesis == "routing-constraints"' "${VAULT}/_index/reflect_state.json"
+}
+
+@test "evolve wiki deterministic outputs and live AGENTS unchanged" {
+  grep -q 'wiki evolvable region' "${REPO_ROOT}/commands/evolve.md"
+
+  cat > "${VAULT}/AGENTS.md" <<'EOF'
+# Wiki Constitution
+
+<!-- evolvable:page-rules -->
+old rules
+<!-- /evolvable -->
+EOF
+  before="$(cat "${VAULT}/AGENTS.md")"
+  cat > "${TMP}/mutator.json" <<'EOF'
+{"variants":[{"body":"new rules","rationale":"test"}]}
+EOF
+
+  run node "${REPO_ROOT}/lib/wiki/wiki_evolve.mjs" --vault "${VAULT}" --apply-candidate "${TMP}/mutator.json" --region page-rules --date 2026-06-09
+  [ "$status" -eq 0 ]
+  [ -f "${VAULT}/_drafts/_schema/agents-page-rules.candidate.md" ]
+  jq -e '.entries[0].region == "page-rules"' "${VAULT}/_index/evolve-ledger.json"
+  [ "$(cat "${VAULT}/AGENTS.md")" = "${before}" ]
+}
+
 @test "publish: Quartz 미설치면 설치 안내 후 비정상 종료" {
   QUARTZ_DIR="${TMP}/no-quartz" VAULT="${VAULT}" run bash "${REPO_ROOT}/scripts/wiki_publish.sh"
   [ "$status" -ne 0 ]
