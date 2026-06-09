@@ -276,6 +276,37 @@ EOF
   [ "$(cat "${VAULT}/AGENTS.md")" = "${before}" ]
 }
 
+@test "publish: synthesis 포함, draft/todos/index/ephemeral 제외" {
+  QUARTZ="${TMP}/quartz"
+  FAKEBIN="${TMP}/bin"
+  mkdir -p "${VAULT}/concepts" "${VAULT}/entities" "${VAULT}/synthesis" "${VAULT}/ephemeral" "${VAULT}/_drafts" "${VAULT}/_todos" "${VAULT}/_index" "${QUARTZ}" "${FAKEBIN}"
+  printf '# Index\n' > "${VAULT}/index.md"
+  printf '# Concept\n' > "${VAULT}/concepts/a.md"
+  printf '# Entity\n' > "${VAULT}/entities/e.md"
+  printf '# Synth\n' > "${VAULT}/synthesis/s.md"
+  printf '# Ephemeral\n' > "${VAULT}/ephemeral/tmp.md"
+  printf '# Draft\n' > "${VAULT}/_drafts/d.md"
+  printf '# Todo\n' > "${VAULT}/_todos/t.md"
+  printf '{}\n' > "${VAULT}/_index/state.json"
+  cat > "${FAKEBIN}/npx" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p public
+printf '<html>ok</html>\n' > public/index.html
+EOF
+  chmod +x "${FAKEBIN}/npx"
+
+  PATH="${FAKEBIN}:${PATH}" QUARTZ_DIR="${QUARTZ}" VAULT="${VAULT}" run bash "${REPO_ROOT}/scripts/wiki_publish.sh"
+  [ "$status" -eq 0 ]
+  [ -f "${QUARTZ}/content/concepts/a.md" ]
+  [ -f "${QUARTZ}/content/entities/e.md" ]
+  [ -f "${QUARTZ}/content/synthesis/s.md" ]
+  [ ! -e "${QUARTZ}/content/_drafts" ]
+  [ ! -e "${QUARTZ}/content/_todos" ]
+  [ ! -e "${QUARTZ}/content/_index" ]
+  [ ! -e "${QUARTZ}/content/ephemeral" ]
+}
+
 @test "publish: Quartz 미설치면 설치 안내 후 비정상 종료" {
   QUARTZ_DIR="${TMP}/no-quartz" VAULT="${VAULT}" run bash "${REPO_ROOT}/scripts/wiki_publish.sh"
   [ "$status" -ne 0 ]
