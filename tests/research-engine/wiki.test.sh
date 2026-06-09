@@ -26,6 +26,42 @@ teardown() { rm -rf "${TMP}"; }
   [ "$(grep -c 'ingest |' "${VAULT}/log.md")" -eq 1 ]
 }
 
+@test "wiki command bootstrap: Obsidian vault 이름 해석 + tagged apply" {
+  grep -q 'vault_resolve.mjs' "${REPO_ROOT}/commands/wiki.md"
+
+  OBS_HOME="${TMP}/home"
+  HARRY="${TMP}/harry"
+  mkdir -p "${OBS_HOME}/Library/Application Support/obsidian" "${HARRY}" "${TMP}/research/2026-04-27-moe"
+  cat > "${OBS_HOME}/Library/Application Support/obsidian/obsidian.json" <<EOF
+{"vaults":{"a":{"path":"${HARRY}","open":true,"ts":200}}}
+EOF
+  cat > "${TMP}/research/2026-04-27-moe/README.md" <<'EOF'
+# MoE
+라우터가 토큰을 일부 전문가에게만 보낸다. [1]
+EOF
+  cat > "${TMP}/research/2026-04-27-moe/sources.json" <<'EOF'
+[{"id":1,"title":"Fixture"}]
+EOF
+
+  run bash -c '
+    set -euo pipefail
+    export CLAUDE_PLUGIN_ROOT="$1"
+    export HOME="$2"
+    export LLM_OBSIDIAN_VAULT_NAME=harry
+    VAULT="$(node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/vault_resolve.mjs")"
+    mkdir -p "${VAULT}/concepts" "${VAULT}/entities" "${VAULT}/synthesis" "${VAULT}/ephemeral" "${VAULT}/_drafts" "${VAULT}/_todos" "${VAULT}/_index"
+    [ -f "${VAULT}/AGENTS.md" ] || cp "${CLAUDE_PLUGIN_ROOT}/lib/wiki/AGENTS.template.md" "${VAULT}/AGENTS.md"
+    [ -f "${VAULT}/index.md" ] || printf "# Wiki Index\n" > "${VAULT}/index.md"
+    cp "$3" "${VAULT}/_index/plan-moe.json"
+    node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/vault_resolve.mjs" --explain > "${VAULT}/_index/vault-explain.json"
+    node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/apply.mjs" --vault "${VAULT}" --plan "${VAULT}/_index/plan-moe.json" --date 2026-05-25
+  ' _ "${REPO_ROOT}" "${OBS_HOME}" "${FIXTURE}"
+  [ "$status" -eq 0 ]
+  [ -f "${HARRY}/LLM-Wiki/concepts/mixture-of-experts.md" ]
+  grep -q 'ai-generated' "${HARRY}/LLM-Wiki/concepts/mixture-of-experts.md"
+  grep -q '"mode": "name"' "${HARRY}/LLM-Wiki/_index/vault-explain.json"
+}
+
 @test "lint CLI: 끊긴 링크·무출처 탐지" {
   mkdir -p "${VAULT}/concepts"
   cat > "${VAULT}/concepts/a.md" <<'EOF'

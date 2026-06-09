@@ -9,12 +9,14 @@ allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Agent
 
 ## Constants
 - `${CLAUDE_PLUGIN_ROOT}` = 플러그인 루트.
-- `VAULT` = `<project_cwd>/wiki`, `RESEARCH_DIR` = `<project_cwd>/research`
+- `VAULT` = `$(node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/vault_resolve.mjs")`, `RESEARCH_DIR` = `<project_cwd>/research`
 - Date today: !`date -u +%Y-%m-%d`
 
 ## 부트스트랩 (모든 액션 공통)
 ```
-mkdir -p "${VAULT}/concepts" "${VAULT}/entities" "${VAULT}/_index"
+VAULT="$(node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/vault_resolve.mjs")"
+node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/vault_resolve.mjs" --explain
+mkdir -p "${VAULT}/concepts" "${VAULT}/entities" "${VAULT}/synthesis" "${VAULT}/ephemeral" "${VAULT}/_drafts" "${VAULT}/_todos" "${VAULT}/_index"
 [ -f "${VAULT}/AGENTS.md" ] || cp "${CLAUDE_PLUGIN_ROOT}/lib/wiki/AGENTS.template.md" "${VAULT}/AGENTS.md"
 [ -f "${VAULT}/index.md" ] || printf '# Wiki Index\n' > "${VAULT}/index.md"
 ```
