@@ -1,11 +1,11 @@
 ---
-description: research 세션을 LLM 위키(wiki/)로 합성·상호링크하고 Quartz로 발행. ingest|query|lint|publish.
-argument-hint: "<ingest <slug|--all|--new> | query \"질문\" | lint [--fix] | publish [--deploy]>"
+description: research 세션을 LLM 위키(wiki/)로 합성·상호링크하고 Quartz로 발행. ingest|query|lint|librarian|publish.
+argument-hint: "<ingest <slug|--all|--new> | query \"질문\" | lint [--fix] | librarian [--report|--apply] [--budget N] | publish [--deploy]>"
 allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Agent
 ---
 
 ## Inputs
-`$ARGUMENTS` — 첫 토큰 = action (ingest|query|lint|publish), 나머지 = 인자.
+`$ARGUMENTS` — 첫 토큰 = action (ingest|query|lint|librarian|publish), 나머지 = 인자.
 
 ## Constants
 - `${CLAUDE_PLUGIN_ROOT}` = 플러그인 루트.
@@ -55,6 +55,18 @@ mkdir -p "${VAULT}/concepts" "${VAULT}/entities" "${VAULT}/synthesis" "${VAULT}/
 1. `node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/lint.mjs" --vault "${VAULT}"` → findings JSON.
 2. rule별로 묶어 한글 표로 보고(unsourced/citation-unresolved/broken-link/orphan/duplicate-name).
 3. (MVP) `--fix`는 **보고 + 수정 안내**만(결정적 자동수정은 후속 spec). 예: broken-link는 어느 page의 `related`에서 어떤 `[[slug]]`를 지울지 안내.
+
+## Action: librarian
+인자: `[--report|--apply] [--budget N]`
+1. 부트스트랩 후 `node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/librarian.mjs" --vault "${VAULT}" --report` 로 audit 결과와 auto/draft 분류를 확인한다.
+2. `--report`면 적용하지 않고 rule별 findings, auto/draft 개수, 리포트 후보를 한글 표로 보고한다.
+3. `--apply`면:
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/librarian.mjs" --vault "${VAULT}" --apply --budget <N|50> --date <today>
+   ```
+   - auto tier: tag 보정, broken-link 제거, stale flag, coverage todo, `change_log.md` 갱신.
+   - draft tier: 신규 페이지·새 링크·synthesis·schema 제안은 `_drafts/` 에 격리하고 `outputs/librarian-<date>.md` 를 쓴다.
+4. 결과 JSON의 `auto.applied`, `draft.drafted`, `report` 경로를 한글 2~3줄로 요약한다. `_drafts/` 산출은 promote 전 live index/graph에 올리지 않는다.
 
 ## Action: publish
 인자: `[--deploy]`

@@ -85,6 +85,68 @@ EOF
   echo "$output" | jq -e '.findings[] | select(.rule=="unsourced" and .slug=="a")'
 }
 
+@test "librarian CLI: safe apply + draft 격리 + report" {
+  grep -q 'Action: librarian' "${REPO_ROOT}/commands/wiki.md"
+
+  mkdir -p "${VAULT}/concepts" "${VAULT}/_index"
+  cat > "${VAULT}/concepts/a.md" <<'EOF'
+---
+type: concept
+title: A
+slug: a
+sources:
+  - research/a
+related:
+  - "[[ghost]]"
+created: 2026-01-01
+updated: 2026-01-01
+---
+
+## 출처별 관점
+### research/a
+- 주장 [1]
+
+## 관련 개념
+
+- [[ghost]]
+EOF
+  cat > "${VAULT}/_index/librarian-plan.json" <<'EOF'
+{
+  "draft": [
+    {
+      "rule": "new-page",
+      "pagePlan": {
+        "source": "research/a",
+        "pages": [
+          {
+            "type": "synthesis",
+            "title": "Synth",
+            "slug": "synth",
+            "aliases": [],
+            "sources": ["research/a"],
+            "confidence": "medium",
+            "tldr": "요약",
+            "perspective": "- 합성 [1].",
+            "links": []
+          }
+        ]
+      }
+    }
+  ]
+}
+EOF
+
+  run node "${REPO_ROOT}/lib/wiki/librarian.mjs" --vault "${VAULT}" --apply --budget 50 --date 2026-06-09
+  [ "$status" -eq 0 ]
+  grep -q 'status: stale' "${VAULT}/concepts/a.md"
+  grep -q 'ai-generated' "${VAULT}/concepts/a.md"
+  ! grep -q '\[\[ghost\]\]' "${VAULT}/concepts/a.md"
+  grep -q 'broken-link' "${VAULT}/change_log.md"
+  grep -q 'stale-flag' "${VAULT}/change_log.md"
+  grep -q 'new-page' "${VAULT}/outputs/librarian-2026-06-09.md"
+  [ -f "${VAULT}/_drafts/synthesis/synth.md" ]
+}
+
 @test "publish: Quartz 미설치면 설치 안내 후 비정상 종료" {
   QUARTZ_DIR="${TMP}/no-quartz" VAULT="${VAULT}" run bash "${REPO_ROOT}/scripts/wiki_publish.sh"
   [ "$status" -ne 0 ]
