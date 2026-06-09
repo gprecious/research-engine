@@ -20,6 +20,18 @@ New bats files added in 0.3.0:
 
 See `tests/acceptance/*.md` — each file is a checklist you step through in a fresh Claude Code session with the plugin installed.
 
+## Plugin release manifests
+
+Keep `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` in lockstep for every plugin release. Claude Code reads the Claude manifest, while Codex reads the Codex manifest for the installed version and cache directory. If only the Claude manifest is bumped, Claude Code can show the latest release while Codex keeps installing an older version from the same source.
+
+Release checklist:
+
+- Update both manifest `version` fields to the same release version.
+- Keep both manifest `name` fields as `research-engine`.
+- When release positioning changes, update both manifest `description` fields together.
+- Run `bats tests/research-engine/plugin-manifest.test.sh` before publishing or updating the marketplace source.
+- After publishing, reinstall Codex from `research-engine@gprecious-marketplace` and verify `codex plugin list` shows the same version.
+
 ### Bench tests
 
 - `tests/bats/test_collect_metrics.bats`

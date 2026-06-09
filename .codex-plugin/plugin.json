@@ -1,7 +1,7 @@
 {
   "name": "research-engine",
-  "version": "0.12.0",
-  "description": "Deep research engine for URLs and topic keywords. Produces structured markdown reports with source attribution and reproducible research artifacts.",
+  "version": "0.18.1",
+  "description": "Deep research engine for URLs (YouTube, arXiv, GitHub, blogs) or topic keywords. Produces structured markdown reports with full source attribution via parallel subagent fanout.",
   "author": {
     "name": "gprecious",
     "email": "yprecious@gmail.com",
