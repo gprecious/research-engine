@@ -147,6 +147,50 @@ EOF
   [ -f "${VAULT}/_drafts/synthesis/synth.md" ]
 }
 
+@test "promote CLI: draft → live + index 갱신 + 멱등" {
+  grep -q 'Action: promote' "${REPO_ROOT}/commands/wiki.md"
+
+  mkdir -p "${VAULT}/_drafts/concepts"
+  cat > "${VAULT}/_drafts/concepts/draft-a.md" <<'EOF'
+---
+type: concept
+title: Draft A
+slug: draft-a
+aliases: []
+sources:
+  - research/a
+related: []
+tags:
+  - ai-generated
+  - llm-wiki
+  - concept
+confidence: medium
+created: 2026-06-08
+updated: 2026-06-08
+---
+
+## TL;DR
+요약
+
+## 출처별 관점
+
+### research/a
+- 주장 [1]
+EOF
+
+  run node "${REPO_ROOT}/lib/wiki/promote.mjs" --vault "${VAULT}" --all --date 2026-06-09
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.promoted == ["concepts/draft-a.md"]'
+  [ -f "${VAULT}/concepts/draft-a.md" ]
+  [ ! -f "${VAULT}/_drafts/concepts/draft-a.md" ]
+  grep -q '\[\[draft-a\]\]' "${VAULT}/index.md"
+
+  run node "${REPO_ROOT}/lib/wiki/promote.mjs" --vault "${VAULT}" --slug draft-a --date 2026-06-09
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.promoted == []'
+  echo "$output" | jq -e '.skipped[0].reason == "already-live"'
+}
+
 @test "publish: Quartz 미설치면 설치 안내 후 비정상 종료" {
   QUARTZ_DIR="${TMP}/no-quartz" VAULT="${VAULT}" run bash "${REPO_ROOT}/scripts/wiki_publish.sh"
   [ "$status" -ne 0 ]
