@@ -307,6 +307,16 @@ EOF
   [ ! -e "${QUARTZ}/content/ephemeral" ]
 }
 
+@test "wiki_librarian_cron: --dry-run echoes claude command" {
+  run bash "${REPO_ROOT}/scripts/wiki_librarian_cron.sh" --dry-run
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -q 'claude -p "/wiki librarian --apply --budget 50"'
+
+  WIKI_LIBRARIAN_BUDGET=75 run bash "${REPO_ROOT}/scripts/wiki_librarian_cron.sh" --dry-run
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -q 'claude -p "/wiki librarian --apply --budget 75"'
+}
+
 @test "publish: Quartz 미설치면 설치 안내 후 비정상 종료" {
   QUARTZ_DIR="${TMP}/no-quartz" VAULT="${VAULT}" run bash "${REPO_ROOT}/scripts/wiki_publish.sh"
   [ "$status" -ne 0 ]
