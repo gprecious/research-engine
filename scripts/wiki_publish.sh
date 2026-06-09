@@ -13,7 +13,9 @@ fi
 
 CONTENT="${QUARTZ_DIR}/content"
 rm -rf "${CONTENT}"; mkdir -p "${CONTENT}"
-cp -r "${VAULT}/concepts" "${VAULT}/entities" "${CONTENT}/" 2>/dev/null || true
+for dir in concepts entities synthesis; do
+  [ -d "${VAULT}/${dir}" ] && cp -r "${VAULT}/${dir}" "${CONTENT}/"
+done
 cp "${VAULT}/index.md" "${CONTENT}/index.md" 2>/dev/null || true
 # 콘텐츠 복사 검증: index.md 가 실제로 들어가야 빈/기본 사이트 발행을 막는다
 test -f "${CONTENT}/index.md" || { echo "publish 실패: ${VAULT}/index.md 복사 안 됨 (vault에 index.md 없음?)" >&2; exit 1; }

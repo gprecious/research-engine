@@ -1,20 +1,22 @@
 ---
-description: research 세션을 LLM 위키(wiki/)로 합성·상호링크하고 Quartz로 발행. ingest|query|lint|publish.
-argument-hint: "<ingest <slug|--all|--new> | query \"질문\" | lint [--fix] | publish [--deploy]>"
+description: research 세션을 LLM 위키(wiki/)로 합성·상호링크하고 Quartz로 발행. ingest|query|lint|librarian|promote|publish.
+argument-hint: "<ingest <slug|--all|--new> | query \"질문\" | lint [--fix] | librarian [--report|--apply] [--budget N] | promote [<slug>|--all] [--critic] | publish [--deploy]>"
 allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Agent
 ---
 
 ## Inputs
-`$ARGUMENTS` — 첫 토큰 = action (ingest|query|lint|publish), 나머지 = 인자.
+`$ARGUMENTS` — 첫 토큰 = action (ingest|query|lint|librarian|promote|publish), 나머지 = 인자.
 
 ## Constants
 - `${CLAUDE_PLUGIN_ROOT}` = 플러그인 루트.
-- `VAULT` = `<project_cwd>/wiki`, `RESEARCH_DIR` = `<project_cwd>/research`
+- `VAULT` = `$(node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/vault_resolve.mjs")`, `RESEARCH_DIR` = `<project_cwd>/research`
 - Date today: !`date -u +%Y-%m-%d`
 
 ## 부트스트랩 (모든 액션 공통)
 ```
-mkdir -p "${VAULT}/concepts" "${VAULT}/entities" "${VAULT}/_index"
+VAULT="$(node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/vault_resolve.mjs")"
+node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/vault_resolve.mjs" --explain
+mkdir -p "${VAULT}/concepts" "${VAULT}/entities" "${VAULT}/synthesis" "${VAULT}/ephemeral" "${VAULT}/_drafts" "${VAULT}/_todos" "${VAULT}/_index"
 [ -f "${VAULT}/AGENTS.md" ] || cp "${CLAUDE_PLUGIN_ROOT}/lib/wiki/AGENTS.template.md" "${VAULT}/AGENTS.md"
 [ -f "${VAULT}/index.md" ] || printf '# Wiki Index\n' > "${VAULT}/index.md"
 ```
@@ -53,6 +55,32 @@ mkdir -p "${VAULT}/concepts" "${VAULT}/entities" "${VAULT}/_index"
 1. `node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/lint.mjs" --vault "${VAULT}"` → findings JSON.
 2. rule별로 묶어 한글 표로 보고(unsourced/citation-unresolved/broken-link/orphan/duplicate-name).
 3. (MVP) `--fix`는 **보고 + 수정 안내**만(결정적 자동수정은 후속 spec). 예: broken-link는 어느 page의 `related`에서 어떤 `[[slug]]`를 지울지 안내.
+
+## Action: librarian
+인자: `[--report|--apply] [--budget N]`
+1. 부트스트랩 후 `node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/librarian.mjs" --vault "${VAULT}" --report` 로 audit 결과와 auto/draft 분류를 확인한다.
+2. `--report`면 적용하지 않고 rule별 findings, auto/draft 개수, 리포트 후보를 한글 표로 보고한다.
+3. `--apply`면:
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/librarian.mjs" --vault "${VAULT}" --apply --budget <N|50> --date <today>
+   ```
+   - auto tier: tag 보정, broken-link 제거, stale flag, coverage todo, `change_log.md` 갱신.
+   - draft tier: 신규 페이지·새 링크·synthesis·schema 제안은 `_drafts/` 에 격리하고 `outputs/librarian-<date>.md` 를 쓴다.
+4. 결과 JSON의 `auto.applied`, `draft.drafted`, `report` 경로를 한글 2~3줄로 요약한다. `_drafts/` 산출은 promote 전 live index/graph에 올리지 않는다.
+
+## Action: promote
+인자: `[<slug>|--all] [--critic]`
+1. `_drafts/concepts`, `_drafts/entities`, `_drafts/synthesis`, `_drafts/ephemeral` 를 나열해 승격 후보를 확인한다.
+2. `--critic` 이 있으면 각 후보의 `sources`(`research/<slug>`)를 읽고 fact-check Agent에게 대조를 맡긴다. reject 된 slug 는 `_drafts/`에 그대로 두고 promote CLI에 넘기지 않는다.
+3. 승인된 단일 slug 는:
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/promote.mjs" --vault "${VAULT}" --slug <slug> --date <today>
+   ```
+   전체 승인분은:
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/promote.mjs" --vault "${VAULT}" --all --date <today>
+   ```
+4. 결과 JSON의 `promoted`, `skipped` 를 한글로 보고한다. 승격은 live 디렉터리 이동/merge, `index.md`, `log.md`, `change_log.md` 갱신까지 포함한다.
 
 ## Action: publish
 인자: `[--deploy]`
