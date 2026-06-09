@@ -39,7 +39,22 @@ Use Korean for synthesized findings and answers unless the user asks for another
 7. Synthesize `README.md` with the section contract in `lib/report_sections.md`. Every factual claim in `핵심 포인트`, `상세 분석`, and `인용 / 원문` must have a precise `[n]` citation.
 8. Write `sources.json` with one-indexed sources, original input, input type, intent, and creation timestamp.
 9. If Notion credentials are configured, run `scripts/push_to_notion.sh <report_dir>`, store `output_notion_url` in `sources.json`, and add the Notion line to `README.md`. If not configured, skip silently.
-10. Final response: report path plus a two-line TL;DR.
+10. **Auto-ingest this run into the LLM wiki** (parity with `commands/research.md` Step 7.6). Fold the just-finished session into the durable wiki immediately, so it never lives only as a raw `research/<slug>/` artifact. Runs automatically; **skip silently** if `WIKI_AUTO_INGEST=0` or no vault resolves; **never** fail the research run on a wiki error (artifacts are already persisted).
+    - Resolve + bootstrap (note: target the **resolved** vault, not local `wiki/`):
+      ```bash
+      [ "${WIKI_AUTO_INGEST:-1}" = "0" ] && echo "wiki auto-ingest disabled" && exit 0
+      node lib/wiki/vault_resolve.mjs --explain      # inspect "ok"
+      VAULT="$(node lib/wiki/vault_resolve.mjs)"      # "ok": false → skip silently (no vault)
+      mkdir -p "${VAULT}"/{concepts,entities,synthesis,ephemeral,_drafts,_todos,_index}
+      [ -f "${VAULT}/AGENTS.md" ] || cp lib/wiki/AGENTS.template.md "${VAULT}/AGENTS.md"
+      [ -f "${VAULT}/index.md" ] || printf '# Wiki Index\n' > "${VAULT}/index.md"
+      ```
+    - Ingest **this run's `<slug>`** via the "Wiki Workflow" ingest contract below, but write to the resolved `${VAULT}`: read `research/<slug>/README.md` + `sources.json` + `${VAULT}/index.md` + `${VAULT}/AGENTS.md` → one `${VAULT}/_index/plan-<slug>.json` (constitution-conformant pagePlan; links only to catalog-real slugs) → apply once:
+      ```bash
+      node lib/wiki/apply.mjs --vault "${VAULT}" --plan "${VAULT}/_index/plan-<slug>.json" --date <today>
+      ```
+      The `log.md` exact-match dedup guard makes re-running `/research` for the same slug a no-op. Capture created/merged counts for the final response.
+11. Final response: report path plus a two-line TL;DR. If the wiki step ran, append one line: `📚 LLM Wiki: {created}개 생성 / {merged}개 병합 → ${VAULT}` (or `wiki: skipped` when no vault).
 
 ## Follow-Up Workflow
 

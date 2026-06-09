@@ -13,6 +13,7 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 - `commands/research.md` — Stage 5 에 **Step 7.6 (Auto-ingest into the LLM Wiki)** 추가. Notion 미러(step 7)·dream-ledger(step 7.5) 직후 실행. `vault_resolve.mjs` 로 vault 해석 → 부트스트랩 → 해당 `<slug>` 를 `commands/wiki.md` 의 단일-slug ingest 절차대로 합성 후 `apply.mjs`. `log.md` exact-match dedup 가드로 동일 slug 재실행은 no-op.
 - 가드: vault 미해석(`ok:false`) 또는 `WIKI_AUTO_INGEST=0` 이면 조용히 skip. 위키 단계 오류는 리서치 산출물에 영향 주지 않음(절대 abort 안 함).
 - vault 타게팅: `WIKI_VAULT`(절대) > `LLM_OBSIDIAN_VAULT_NAME`(+`LLM_WIKI_SUBDIR`, 기본 `LLM-Wiki`) — 기존 `vault_resolve.mjs` 정책 그대로. 동일 이름 vault 가 여러 개면 `WIKI_VAULT` 절대경로 핀 권장(split-brain 회피).
+- **Codex 패리티**: `skills/research-engine/SKILL.md` 의 New Research Workflow 에 auto-ingest 단계(step 10) 추가 — Claude 의 Step 7.6 과 동등하게 `vault_resolve.mjs` 로 resolved vault(harry/`LLM-Wiki`)에 자동 합성(로컬 `wiki/` 아님). `.codex-plugin/plugin.json` 0.18.1→0.19.0 동기(이전엔 codex 매니페스트만 lag 라 codex 로 research 시 auto-ingest 가 미작동). 이제 Claude·Codex 양 런타임에서 동일 동작.
 
 ## [0.18.2]
 
