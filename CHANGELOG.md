@@ -5,6 +5,19 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
 ## [Unreleased]
 
+## [0.17.1]
+
+로컬 Whisper 백엔드 — 자막 없는 영상의 음성 전사를 **클라우드 키 없이** 온디바이스로 수행. Whisper 는 본래 키가 필요 없는데 `yt_fetch.sh` 가 Groq/OpenAI 호스팅 API 로만 하드코딩돼 있어, 키 미설정 시 frames/whisper 교차검증이 조용히 누락되던 문제 해결 (Apple Silicon 사용자에게 특히 부적절했음).
+
+### Added
+- `scripts/yt_fetch.sh` — `whisper_local()` + `whisper_local_available()`: Apple Silicon 은 `mlx-whisper`(기본 `mlx-community/whisper-large-v3-turbo`), 그 외 `openai-whisper` 로 온디바이스 전사. verbose_json 형태로 출력해 기존 `emit_whisper_ok`/`write_vtt_from_whisper_json` 파이프라인을 그대로 통과.
+- 환경변수: `RESEARCH_ENGINE_WHISPER_MODEL`(mlx HF repo), `RESEARCH_ENGINE_WHISPER_OPENAI_MODEL`(openai-whisper 이름, 기본 `turbo`), `RESEARCH_ENGINE_WHISPER_DISABLE_LOCAL=1`(로컬 비활성).
+- `tests/bats/test_yt_fetch_whisper.bats` — 백엔드 부재 메시지, 로컬 스텁 전사, 로컬 우선순위(키 있어도 네트워크 미호출) 3종.
+
+### Changed
+- `whisper_fallback()` 우선순위: **로컬(키 불필요) → Groq → OpenAI**. 백엔드가 하나도 없을 때만 실패하며, 에러 메시지가 로컬 설치(`pip install mlx-whisper`)를 우선 안내.
+- `tests/bats/test_yt_fetch.bats` — 클라우드/캐시/자막 검증 테스트의 결정성을 위해 `setup()` 에서 로컬 백엔드 비활성 (mlx-whisper 설치된 머신에서 로컬이 우선되어 깨지는 것 방지).
+
 ## [0.17.0]
 
 YouTube 분석 AV-first 전환 — 영상(frames)+오디오(Whisper)를 모든 영상에서 기본 수행, 자막은 교차 검증용. herdr 3-worker(claude/codex/omp) 상호 비판 리뷰 합의 반영.

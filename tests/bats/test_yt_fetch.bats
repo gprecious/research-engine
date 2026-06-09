@@ -5,6 +5,11 @@ FIXTURE="$BATS_TEST_DIRNAME/../fixtures/yt_dlp_sample_dump.json"
 
 setup() {
   TMPDIR_TEST="$(mktemp -d)"
+  # These tests assert cloud-whisper / no-key / caching behavior; pin the local
+  # backend off so they stay deterministic on dev machines that have mlx-whisper
+  # installed (local would otherwise take priority). Local path is covered by
+  # test_yt_fetch_whisper.bats.
+  export RESEARCH_ENGINE_WHISPER_DISABLE_LOCAL=1
 }
 teardown() {
   rm -rf "$TMPDIR_TEST"

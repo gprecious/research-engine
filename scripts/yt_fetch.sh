@@ -7,8 +7,10 @@
 #   media <URL> <DIR>                    — downloads the video once, prints {status, path, cached}
 #   transcribe <FILE|URL> <DIR>          — Whisper transcription directly (no caption check)
 #   captions <URL> <DIR> [--captions-only]
-#                                         — downloads captions; falls back to Groq Whisper when
-#                                           absent unless --captions-only is given
+#                                         — downloads captions; falls back to Whisper when
+#                                           absent unless --captions-only is given. Whisper
+#                                           order: local (mlx-whisper/openai-whisper, no key)
+#                                           → Groq → OpenAI.
 #   frames <URL|FILE> <DIR> [--start S] [--end E]
 #                                         — extracts sampled JPEG frames + frames.json
 #
@@ -205,6 +207,59 @@ emit_whisper_ok() {
     '{status:"ok", transcript_source:"whisper", whisper_model:$model, transcript_vtt:$vtt, transcript_json:$json, failures:[]}'
 }
 
+# Local, key-free transcription. Whisper does NOT require a cloud key — this runs the
+# model on-device. Apple Silicon: mlx-whisper (preferred); otherwise openai-whisper.
+# Override the model via RESEARCH_ENGINE_WHISPER_MODEL (mlx HF repo) /
+# RESEARCH_ENGINE_WHISPER_OPENAI_MODEL (openai-whisper name); disable entirely with
+# RESEARCH_ENGINE_WHISPER_DISABLE_LOCAL=1.
+WHISPER_LOCAL_MODEL_DEFAULT="mlx-community/whisper-large-v3-turbo"
+
+# Returns 0 if a local backend can be used (python3 + mlx_whisper or whisper importable).
+whisper_local_available() {
+  [[ "${RESEARCH_ENGINE_WHISPER_DISABLE_LOCAL:-0}" == "1" ]] && return 1
+  command -v python3 >/dev/null 2>&1 || return 1
+  python3 - <<'PY' 2>/dev/null
+import importlib.util, sys
+sys.exit(0 if (importlib.util.find_spec("mlx_whisper") or importlib.util.find_spec("whisper")) else 1)
+PY
+}
+
+# Transcribes $1 (audio) locally, writing verbose_json-shaped output to $2 so it flows
+# through emit_whisper_ok / write_vtt_from_whisper_json unchanged. Prints the backend id
+# on success; non-zero exit on failure (caller falls through to cloud providers).
+whisper_local() {
+  local audio="$1" out="$2"
+  local mlx_model="${RESEARCH_ENGINE_WHISPER_MODEL:-${WHISPER_LOCAL_MODEL:-$WHISPER_LOCAL_MODEL_DEFAULT}}"
+  local openai_model="${RESEARCH_ENGINE_WHISPER_OPENAI_MODEL:-turbo}"
+  python3 - "$audio" "$out" "$mlx_model" "$openai_model" <<'PY'
+import sys, json, importlib.util
+audio, out, mlx_model, openai_model = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+result, backend, errs = None, None, []
+if importlib.util.find_spec("mlx_whisper"):
+    try:
+        import mlx_whisper
+        result = mlx_whisper.transcribe(audio, path_or_hf_repo=mlx_model)
+        backend = "mlx-whisper:" + mlx_model.split("/")[-1]
+    except Exception as e:
+        errs.append("mlx_whisper: %r" % e)
+if result is None and importlib.util.find_spec("whisper"):
+    try:
+        import whisper
+        result = whisper.load_model(openai_model).transcribe(audio)
+        backend = "openai-whisper:" + openai_model
+    except Exception as e:
+        errs.append("openai-whisper: %r" % e)
+if result is None:
+    sys.stderr.write("; ".join(errs) + "\n")
+    sys.exit(3)
+segs = [{"start": float(s.get("start", 0) or 0), "end": float(s.get("end", 0) or 0),
+         "text": s.get("text", "")} for s in (result.get("segments") or [])]
+json.dump({"text": result.get("text", ""), "language": result.get("language", ""),
+           "segments": segs, "backend": backend}, open(out, "w"))
+print(backend)
+PY
+}
+
 # Posts the extracted audio to an OpenAI-compatible transcription endpoint.
 # `curl --retry` treats transient 408/429/5xx and timeouts as retryable, honoring
 # the server's Retry-After header (curl >= 7.66) with exponential backoff in between.
@@ -236,21 +291,35 @@ whisper_fallback() {
       '{status:"ok", transcript_source:"whisper", whisper_model:"cached", transcript_vtt:$vtt, transcript_json:$json, failures:[]}'
     return 0
   fi
-  local groq_key openai_key
+  local groq_key openai_key have_local=0
   groq_key="$(load_groq_key || true)"
   openai_key="$(load_openai_key || true)"
-  if [[ -z "$groq_key" && -z "$openai_key" ]]; then
-    jq -n '{status:"partial", transcript_source:"none", failures:[{step:"whisper", error:"neither GROQ_API_KEY nor OPENAI_API_KEY configured"}]}'
+  if whisper_local_available; then have_local=1; fi
+  # 사용 가능한 백엔드가 하나도 없을 때만 실패 — 로컬 설치 안내를 우선한다 (로컬 우선 원칙).
+  if [[ "$have_local" -eq 0 && -z "$groq_key" && -z "$openai_key" ]]; then
+    jq -n '{status:"partial", transcript_source:"none", failures:[{step:"whisper", error:"no whisper backend available — install a local one (Apple Silicon: pip install mlx-whisper) or set GROQ_API_KEY / OPENAI_API_KEY"}]}'
     return 0
   fi
-  command -v curl >/dev/null || die "curl not installed"
   if ! extract_audio "$input" "$dir"; then
     jq -n '{status:"partial", transcript_source:"none", failures:[{step:"audio_extract", error:"ffmpeg audio extraction failed"}]}'
     return 0
   fi
   local response="$dir/whisper.json"
   local tried=()
-  # Prefer Groq (cheaper/faster); fall back to OpenAI whisper-1 on failure.
+  # 0순위 — 로컬 (키 불필요, 데이터가 기기 밖으로 나가지 않음; Apple Silicon은 mlx-whisper).
+  if [[ "$have_local" -eq 1 ]]; then
+    local backend
+    if backend="$(whisper_local "$dir/audio.mp3" "$response" 2>"$dir/whisper_local.err")" \
+         && jq -e '.segments and (.segments | length > 0)' "$response" >/dev/null 2>&1; then
+      emit_whisper_ok "$response" "$dir/whisper.vtt" "$backend"
+      return 0
+    fi
+    tried+=("local")
+  fi
+  # 1순위 Groq, 2순위 OpenAI — 호스팅 (curl 필요).
+  if [[ -n "$groq_key" || -n "$openai_key" ]]; then
+    command -v curl >/dev/null || die "curl not installed"
+  fi
   if [[ -n "$groq_key" ]]; then
     if whisper_request "https://api.groq.com/openai/v1/audio/transcriptions" \
          "whisper-large-v3" "$groq_key" "$dir/audio.mp3" "$response"; then
@@ -270,7 +339,7 @@ whisper_fallback() {
   local tried_csv
   tried_csv="$(IFS=','; printf '%s' "${tried[*]}")"
   jq -n --arg tried "$tried_csv" \
-    '{status:"partial", transcript_source:"none", failures:[{step:"whisper", error:("all configured whisper providers failed: " + $tried)}]}'
+    '{status:"partial", transcript_source:"none", failures:[{step:"whisper", error:("all whisper backends failed: " + $tried)}]}'
 }
 
 pick_caption_lang() {
