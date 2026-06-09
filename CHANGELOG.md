@@ -5,6 +5,26 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
 ## [Unreleased]
 
+## [0.18.0]
+
+Obsidian-backed LLM Wiki librarian release. `/wiki` now resolves a single global vault, tags generated pages, maintains safe fixes automatically, drafts risky synthesis/schema output, promotes approved drafts, and publishes only verified live content.
+
+### Added
+- Name-based Obsidian vault resolution via `WIKI_VAULT`, `LLM_OBSIDIAN_VAULT_NAME`, and `LLM_WIKI_SUBDIR`.
+- Generated-page tagging: `ai-generated`, `llm-wiki`, and page type.
+- `/wiki librarian --report|--apply --budget N` with stale/provenance/raw-coverage audit, safe auto fixes, `change_log.md`, reports, and draft isolation.
+- `/wiki promote [<slug>|--all] [--critic]` for `_drafts/` to live promotion with index/log/change-log updates.
+- `/dream --target=wiki` deterministic draft synthesis + `_todos` + `_index/reflect_state.json`.
+- `/evolve --target=wiki --region=<region>` schema candidate drafts + `_index/evolve-ledger.json` without mutating live `AGENTS.md`.
+- `scripts/wiki_librarian_cron.sh` headless monthly wrapper with `--dry-run`.
+
+### Changed
+- `scripts/wiki_publish.sh` now publishes `concepts/`, `entities/`, and `synthesis/`, while excluding `_drafts/`, `_todos/`, `_index/`, and `ephemeral/`.
+- Wiki constitution and index now mark AI-generated content and document temporal/promotion rules.
+
+### Fixed
+- Librarian raw-coverage discovery ignores non-session directories such as `research/_index`.
+
 ## [0.17.0]
 
 YouTube 분석 AV-first 전환 — 영상(frames)+오디오(Whisper)를 모든 영상에서 기본 수행, 자막은 교차 검증용. herdr 3-worker(claude/codex/omp) 상호 비판 리뷰 합의 반영.

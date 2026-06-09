@@ -188,6 +188,47 @@ cp agents/archive/youtube-adapter.v2.md agents/youtube-adapter.md
 
 Spec: `docs/superpowers/plans/2026-05-24-adapter-prompt-evolution-loop.md`.
 
+### LLM Wiki / Obsidian librarian
+
+`/wiki` can ingest research sessions into a durable Obsidian-backed LLM Wiki, maintain it with a librarian pass, and keep risky generated changes behind a draft/promotion gate.
+
+```bash
+/wiki ingest <research-slug>              # create/update tagged concept/entity pages
+/wiki query "질문"                        # answer from wiki pages, not raw research
+/wiki lint                                # report source/link/orphan/duplicate issues
+/wiki librarian --report                  # audit only
+/wiki librarian --apply --budget 50       # safe fixes + draft risky outputs
+/wiki promote <slug>                      # _drafts/<type>/<slug>.md -> live
+/wiki promote --all                       # promote all drafts
+/wiki publish                             # Quartz publish, excluding drafts/todos/index/ephemeral
+
+/dream --target=wiki                      # wiki corpus -> _drafts/synthesis + _todos
+/evolve --target=wiki --region=page-rules # schema candidate -> _drafts/_schema
+```
+
+Vault resolution is machine-local and name-based:
+
+```bash
+export WIKI_VAULT=/absolute/path/to/wiki          # highest priority
+export LLM_OBSIDIAN_VAULT_NAME=harry             # resolve by Obsidian vault name
+export LLM_WIKI_SUBDIR=LLM-Wiki                  # default subdir
+node lib/wiki/vault_resolve.mjs --explain
+```
+
+Generated wiki pages are tagged with `ai-generated`, `llm-wiki`, and their type. `librarian --apply` only applies safe deterministic fixes directly; new pages, synthesis, schema changes, and new cross-links remain in `_drafts/` until promoted.
+
+Monthly headless librarian example:
+
+```cron
+0 3 1 * * cd /path/to/research-engine && WIKI_LIBRARIAN_BUDGET=50 scripts/wiki_librarian_cron.sh
+```
+
+Dry-run the scheduled command without invoking Claude:
+
+```bash
+bash scripts/wiki_librarian_cron.sh --dry-run
+```
+
 ## Notion mirroring (optional one-time setup)
 
 When `NOTION_TOKEN` + `NOTION_PARENT_PAGE_ID` are set, every `/research` run upserts a row in a `research-engine` database under the parent page. Each session is a single consolidated page whose body holds the main report plus collapsible toggles for transcript, followups, and related materials. Re-running the same session (e.g. via `/research-followup`) updates the row in place instead of duplicating.
