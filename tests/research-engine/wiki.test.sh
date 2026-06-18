@@ -45,6 +45,8 @@ EOF
 
   run bash -c '
     set -euo pipefail
+    # hermetic: 머신 env 의 명시 vault override 를 제거해 name-resolution 만 검증(실제 vault 오염 방지).
+    unset WIKI_VAULT LLM_WIKI_SUBDIR
     export CLAUDE_PLUGIN_ROOT="$1"
     export HOME="$2"
     export LLM_OBSIDIAN_VAULT_NAME=harry
