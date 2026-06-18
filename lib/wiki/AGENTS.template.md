@@ -7,6 +7,7 @@
 - `concepts/`, `entities/` = 이 위키가 생성하는 atemporal 합성 페이지.
 - `synthesis/` = dream 전용 cross-wiki 페이지. 반드시 2개 이상 소스 페이지 근거를 명시한다.
 - `ephemeral/` = 세션성·TTL 지식. frontmatter `expires`가 있으면 만료 후보로 본다.
+- `reports/` = research README **전문(verbatim) 사본**. ingest/lint/index 대상 아님(원문 보관소). 조회는 가능. 절대 개념 페이지로 취급하지 않는다.
 - `_drafts/` = 미승인 산출 대기소. query/publish/index 대상에서 제외한다.
 - `index.md` = 카탈로그(재생성). 링크 선택의 근거. `log.md` = append-only 인제스트 원장(소스당 1줄).
 
