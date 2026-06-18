@@ -194,9 +194,15 @@ Fold this session into the durable LLM wiki immediately, so a research run never
    node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/apply.mjs" --vault "${VAULT}" --plan "${VAULT}/_index/plan-<slug>.json" --date <today>
    ```
    - The `log.md` exact-match dedup guard from wiki.md applies, so re-running `/research` for the same slug is a no-op (no duplicate pages).
-3. Capture the apply result (created/merged counts) for the final message. On any error in this step, log it and continue — the research artifacts are already persisted.
+3. **Mirror the verbatim report** — "결과물 그대로" 요구. distilled 위키와 **별개로** README 전문을 vault `reports/` 에 한국어 파일명으로 보존한다. `WIKI_MIRROR_REPORT`(기본 on)로 끄며, vault 미해석(`ok:false`) 시 함께 skip.
+   ```bash
+   [ "${WIKI_MIRROR_REPORT:-1}" = "0" ] && echo "wiki report mirror disabled (WIKI_MIRROR_REPORT=0)" || \
+   node "${CLAUDE_PLUGIN_ROOT}/lib/wiki/report_mirror.mjs" --vault "${VAULT}" --research-dir "research/<slug>" --date <today>
+   ```
+   - 결과: `${VAULT}/reports/<date> <한국어 title>.md` — body 는 README 그대로, frontmatter 만 증강(`tags: [ai-generated, research-report]`, `report_slug`, `source`). `report_slug` 기준 idempotent. `reports/` 는 `listPages`/`lint` 스캔 밖이라 concept/entity index·graph 를 오염시키지 않는다.
+4. Capture the apply result (created/merged counts) and the mirror result (file path, if any) for the final message. On any error in this step, log it and continue — the research artifacts are already persisted.
 
-8. Final message to user: one line with `<report_dir>/README.md` path + Notion URL (if pushed) + a 2-line TL;DR preview. If Step 7.6 ran, append one line: `📚 LLM Wiki: {created}개 생성 / {merged}개 병합 → {VAULT}` (or `wiki: skipped` when no vault).
+8. Final message to user: one line with `<report_dir>/README.md` path + Notion URL (if pushed) + a 2-line TL;DR preview. If Step 7.6 ran, append one line: `📚 LLM Wiki: {created}개 생성 / {merged}개 병합 → {VAULT}` (or `wiki: skipped` when no vault). If the verbatim mirror ran, append one more line: `📄 Report (verbatim): {VAULT}/reports/<file>`.
 
 ## Cache policy
 

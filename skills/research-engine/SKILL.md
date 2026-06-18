@@ -54,7 +54,12 @@ Use Korean for synthesized findings and answers unless the user asks for another
       node lib/wiki/apply.mjs --vault "${VAULT}" --plan "${VAULT}/_index/plan-<slug>.json" --date <today>
       ```
       The `log.md` exact-match dedup guard makes re-running `/research` for the same slug a no-op. Capture created/merged counts for the final response.
-11. Final response: report path plus a two-line TL;DR. If the wiki step ran, append one line: `📚 LLM Wiki: {created}개 생성 / {merged}개 병합 → ${VAULT}` (or `wiki: skipped` when no vault).
+    - **Mirror the verbatim report** (parity with `commands/research.md` Step 7.6.3): unless `WIKI_MIRROR_REPORT=0` or the vault did not resolve, copy the full README verbatim into `${VAULT}/reports/` with a Korean human-readable filename:
+      ```bash
+      [ "${WIKI_MIRROR_REPORT:-1}" = "0" ] || node lib/wiki/report_mirror.mjs --vault "${VAULT}" --research-dir "research/<slug>" --date <today>
+      ```
+      Body unchanged; frontmatter augmented with `tags: [ai-generated, research-report]`, `report_slug`, `source`. Idempotent per `report_slug`; the `reports/` folder is isolated from the concept/entity index + lint. Never fail the run on a mirror error. Capture the mirrored file path for the final response.
+11. Final response: report path plus a two-line TL;DR. If the wiki step ran, append one line: `📚 LLM Wiki: {created}개 생성 / {merged}개 병합 → ${VAULT}` (or `wiki: skipped` when no vault). If the verbatim mirror ran, append one more line: `📄 Report (verbatim): ${VAULT}/reports/<file>`.
 
 ## Follow-Up Workflow
 
