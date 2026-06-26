@@ -5,6 +5,15 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
 ## [Unreleased]
 
+## [0.20.1]
+
+LLM 위키 auto-ingest 가 **git clone 배포 환경에서 조용히 실패하던 패키징 결함** 수정.
+
+### Fixed
+
+- `lib/wiki/frontmatter.mjs` 의 `yaml` npm 의존성 제거 — 위키 페이지 frontmatter 의 고정·평면 스키마(문자열 스칼라 + 문자열 배열)에 맞춘 무의존 parse/serialize 로 대체. `node_modules` 가 gitignore 되어 URL clone 설치 시 미동봉이고 `npm install` 도 돌지 않아 `apply.mjs`/`report_mirror.mjs` 가 `ERR_MODULE_NOT_FOUND: yaml` 로 크래시 → auto-ingest 가 에러 없이 무산되던 문제를 영구 해소. 기존 위키 88개 페이지에 대해 실제 `yaml` 출력과 바이트 동일(파서 동등성·라운드트립·zero churn 검증) + 기존 `lib/wiki` vitest 70개 전부 통과.
+- `package.json` 의 유일한 runtime dependency(`yaml`) 제거 → 플러그인은 이제 런타임 의존성이 전혀 없어 git clone 만으로 동작. `.claude-plugin`·`.codex-plugin` 매니페스트 0.20.0→0.20.1 동기.
+
 ## [0.19.0]
 
 `/research` 가 끝나면 **자동으로 LLM 위키에 ingest** — 리서치 결과가 raw `research/<slug>/` 로만 남지 않고 즉시 harry 등 Obsidian 위키(`LLM-Wiki/`)로 합성된다.
