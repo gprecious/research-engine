@@ -8,6 +8,9 @@ allowed-tools: Bash, Read, Write, Edit, Agent, Skill
 
 `$ARGUMENTS` :
 - positional 1 (선택): adapter name (default: dream-ledger 의 가장 약한 어댑터 — 일단 v1 은 사용자가 명시)
+  - Eligible targets are any `agents/<name>.md` with `<!-- evolvable:… -->` regions. Beyond the source adapters this now includes:
+    - `lens-planner` regions: `lens-selection`, `question-generation`
+    - `claim-reviewer` regions: `contradiction-detection`, `missing-lens-detection`
 - positional 2 (선택): region id (default: 첫 번째 evolvable region)
 - `--target=wiki --region=<region>`: wiki evolvable region 후보를 `_drafts/_schema/` 에 생성
 
