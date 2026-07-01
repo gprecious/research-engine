@@ -5,6 +5,17 @@ Versions follow [semver](https://semver.org/) — MAJOR.MINOR.PATCH.
 
 ## [Unreleased]
 
+## 0.21.0
+
+### Added
+- **Stage 3.5 — Lens Plan** (`lens_plan.json`): STORM-style perspective planner (`lens-planner` agent), gated ON for topic / weak-preview inputs or `--lens`. Threads per-lens questions + search queries into Stage 4 adapter prompts as hints only.
+- **Stage 4.6 — Claim Review** (`claim_review.json`): central contradiction / evidence-reliability / missing-lens reviewer (`claim-reviewer` agent), gated by source count + lens plan or `--review`. Feeds two optional report sections: `## 검증 매트릭스`, `## 누락 관점 / 후속 질문`.
+- Deterministic gates: `scripts/lens_gate.sh`, `scripts/claim_review_gate.sh`.
+- Ajv validators + schemas for both artifacts; both new agents carry `<!-- evolvable:… -->` regions and are `/evolve`-eligible.
+
+### Notes
+- Both layers are optional and no-op when their gate is off or their artifact is absent — default narrow single-source runs are unchanged.
+
 ## [0.20.1]
 
 LLM 위키 auto-ingest 가 **git clone 배포 환경에서 조용히 실패하던 패키징 결함** 수정.
