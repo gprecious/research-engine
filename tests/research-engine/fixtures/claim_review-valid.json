@@ -1,0 +1,28 @@
+{
+  "slug": "2026-07-01-voice-ai-agents",
+  "reviewed": true,
+  "created": "2026-07-01T12:00:00Z",
+  "claims": [
+    {
+      "claim": "STORM은 oRAG 대비 Organization >=4 비율이 25%p 높다",
+      "supporting_sources": [2],
+      "challenging_sources": [],
+      "citation_status": "supported",
+      "confidence": "high",
+      "corrected_text": null,
+      "needs_followup": false
+    },
+    {
+      "claim": "STORM skill이 Claude Deep Research보다 항상 우수하다",
+      "supporting_sources": [1],
+      "challenging_sources": [1],
+      "citation_status": "partial",
+      "confidence": "low",
+      "corrected_text": "단일 데모 비교이며 독립 벤치마크로 일반화되지 않는다",
+      "needs_followup": true
+    }
+  ],
+  "missing_lenses": [
+    {"lens": "고객/최종 사용자 관점", "why": "owner 관점 결과만 있어 실제 사용자 체감이 빠짐", "followup_query": "voice ai agent end-user satisfaction study"}
+  ]
+}

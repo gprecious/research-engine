@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gprecious/research-engine/schemas/claim_review.json",
+  "title": "research-engine claim review",
+  "type": "object",
+  "required": ["slug", "reviewed", "claims", "missing_lenses"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "slug": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}-.+$" },
+    "reviewed": { "type": "boolean" },
+    "created": { "type": "string" },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim", "supporting_sources", "challenging_sources", "citation_status", "confidence", "needs_followup"],
+        "additionalProperties": false,
+        "properties": {
+          "claim": { "type": "string", "minLength": 1 },
+          "supporting_sources": { "type": "array", "items": { "type": "integer", "minimum": 1 } },
+          "challenging_sources": { "type": "array", "items": { "type": "integer", "minimum": 1 } },
+          "citation_status": { "type": "string", "enum": ["supported", "partial", "unsupported", "contradicted"] },
+          "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+          "corrected_text": { "type": ["string", "null"] },
+          "needs_followup": { "type": "boolean" }
+        }
+      }
+    },
+    "missing_lenses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["lens", "why"],
+        "additionalProperties": false,
+        "properties": {
+          "lens": { "type": "string", "minLength": 1 },
+          "why": { "type": "string", "minLength": 1 },
+          "followup_query": { "type": "string" }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "reviewed": { "const": false } }, "required": ["reviewed"] },
+      "then": { "properties": { "claims": { "maxItems": 0 } } }
+    }
+  ]
+}
