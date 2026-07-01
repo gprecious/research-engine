@@ -1,0 +1,25 @@
+{
+  "slug": "2026-07-01-voice-ai-agents",
+  "input_type": "topic",
+  "generated": true,
+  "gate_reason": "topic-mode",
+  "created": "2026-07-01T12:00:00Z",
+  "lenses": [
+    {
+      "lens_id": "practitioner",
+      "title": "현업 실무자 관점",
+      "rationale": "실제 배포·운영에서 드러나는 제약을 다른 관점이 놓치기 쉽다",
+      "questions": ["프로덕션에서 가장 흔한 실패 모드는?", "지연/비용 트레이드오프는?"],
+      "search_queries": ["voice ai agent production latency", "voice agent cost per minute"],
+      "expected_blind_spots": ["학술 벤치마크가 실제 통화 품질을 대변하지 못함"]
+    },
+    {
+      "lens_id": "skeptic",
+      "title": "회의론자 관점",
+      "rationale": "과대광고와 재현 불가한 데모를 걸러낸다",
+      "questions": ["독립 재현된 결과가 있나?"],
+      "search_queries": ["voice ai agent limitations criticism"],
+      "expected_blind_spots": ["벤더 데모 편향"]
+    }
+  ]
+}

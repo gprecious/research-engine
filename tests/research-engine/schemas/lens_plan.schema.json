@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gprecious/research-engine/schemas/lens_plan.json",
+  "title": "research-engine lens plan",
+  "type": "object",
+  "required": ["slug", "generated", "gate_reason", "lenses"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "slug": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}-.+$" },
+    "input_type": { "type": "string" },
+    "generated": { "type": "boolean" },
+    "gate_reason": {
+      "type": "string",
+      "enum": ["topic-mode", "weak-preview", "forced", "disabled-narrow-input", "disabled-flag"]
+    },
+    "created": { "type": "string" },
+    "lenses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["lens_id", "title", "rationale", "questions", "search_queries", "expected_blind_spots"],
+        "additionalProperties": false,
+        "properties": {
+          "lens_id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+          "title": { "type": "string", "minLength": 1 },
+          "rationale": { "type": "string", "minLength": 1 },
+          "questions": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+          "search_queries": { "type": "array", "items": { "type": "string" } },
+          "expected_blind_spots": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "generated": { "const": true } }, "required": ["generated"] },
+      "then": { "properties": { "lenses": { "minItems": 2 } } }
+    },
+    {
+      "if": { "properties": { "generated": { "const": false } }, "required": ["generated"] },
+      "then": { "properties": { "lenses": { "maxItems": 0 } } }
+    }
+  ]
+}

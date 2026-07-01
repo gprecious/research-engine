@@ -1,0 +1,2 @@
+{ "slug": "2026-07-01-x", "generated": true, "gate_reason": "topic-mode",
+  "lenses": [ { "lens_id": "a", "title": "A", "rationale": "r", "questions": ["q"], "search_queries": [], "expected_blind_spots": [] } ] }
