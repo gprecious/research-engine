@@ -1,6 +1,6 @@
 ---
 description: Deep research on a URL (YouTube/arXiv/GitHub/blog/docs) or topic keyword. Produces research/YYYY-MM-DD-<slug>/README.md.
-argument-hint: "<URL or topic> [--yes] [--fresh] [--slug <name>]"
+argument-hint: "<URL or topic> [--yes] [--fresh] [--slug <name>] [--lens|--no-lens] [--review|--no-review]"
 allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Agent, WebFetch, WebSearch
 ---
 
@@ -11,6 +11,8 @@ allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Agent, WebFetch, WebSearch
 - `--yes`: skip Intent Q&A, engine infers
 - `--fresh`: bypass cache
 - `--slug <name>`: manual slug override
+- `--lens` / `--no-lens`: force lens planning (Stage 3.5) on/off, overriding the gate
+- `--review` / `--no-review`: force claim review (Stage 4.6) on/off, overriding the gate
 
 ## Constants
 
@@ -82,6 +84,23 @@ Save intent to `<report_dir>/intent.json`.
 
 **실행 모델**: `/research` 슬래시 커맨드는 Intent Q&A 응답을 받을 때까지 블로킹. 사용자는 터미널에서 응답을 타이핑하고, 그 뒤 Stage 4로 진행.
 
+### Stage 3.5 — Lens Plan (optional, gated)
+
+STORM-style perspective planning. Runs BEFORE adapter dispatch, and only for broad/ambiguous inputs, to widen question coverage without forcing fixed personas.
+
+1. Decide the gate deterministically. `preview_status` is `ok` normally, `weak` when the preview was thin (few snippets / no chapters / < 500 chars), `failed` when Stage 2 preview errored:
+   ```bash
+   GATE=$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/lens_gate.sh" "<input_type>" "<preview_status>" "<--lens|--no-lens|>")
+   # → {"gate":"on|off","reason":"..."}
+   ```
+2. If `gate == off`: **skip this stage** — do not create `lens_plan.json` (Stage 4 treats absence as no-op). Log one line: `lens plan skipped (<reason>)`. Proceed to Stage 4.
+3. If `gate == on`: dispatch the `lens-planner` subagent with a single Agent call. Inputs: `{slug, input_type, preview, intent, prior_knowledge: <cache/memory.json>, gate_reason: <reason>}`. It returns a single fenced JSON block per `tests/research-engine/schemas/lens_plan.schema.json`.
+4. Write the returned object to `<report_dir>/lens_plan.json`, stamping `created` (ISO8601). Validate it:
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/lib/lens_plan_validator.mjs" "<report_dir>/lens_plan.json"   # exit 0 + "OK"
+   ```
+   If validation fails, log the errors, delete the file, and continue as if the gate were off — never abort the run for a bad lens plan.
+
 ### Stage 4 — Plan & Parallel Dispatch
 
 Apply `superpowers:dispatching-parallel-agents`. Build a work plan:
@@ -95,20 +114,40 @@ Apply `superpowers:dispatching-parallel-agents`. Build a work plan:
   - If preview links HN/Reddit threads → community-adapter (pass `thread_urls`)
   - For topic mode → all tier-1 + community-adapter with `topic_query`.
 
-Dispatch each adapter with a single Agent call, parallel (issue all Agent tool calls in one assistant message). Before dispatching, dispatcher reads <report_dir>/cache/memory.json once and includes the same JSON as the `prior_knowledge` field in every adapter's input. Per-adapter prompt template:
+Dispatch each adapter with a single Agent call, parallel (issue all Agent tool calls in one assistant message). Before dispatching, dispatcher reads <report_dir>/cache/memory.json once and includes the same JSON as the `prior_knowledge` field in every adapter's input. If `<report_dir>/lens_plan.json` exists (Stage 3.5 ran and passed validation), the dispatcher also reads it once and includes a `lens_hints` field in every adapter's input: `lens_hints = { lenses: [{lens_id, questions, search_queries}], expected_blind_spots: [...] }` (flatten from `lens_plan.lenses`). If the file is absent, omit `lens_hints` entirely (no-op). Per-adapter prompt template:
 
 ```
 You are dispatched as the <adapter-name> subagent for research session <slug>.
 
 Inputs:
-  <JSON of {url|targets|libraries|thread_urls, intent, cache_dir, slug, fresh, prior_knowledge}>
+  <JSON of {url|targets|libraries|thread_urls, intent, cache_dir, slug, fresh, prior_knowledge, lens_hints?}>
 
 prior_knowledge (when non-empty) contains the contents of <report_dir>/cache/memory.json — similar past sessions and active dream insights from the research-engine memory layer. Treat it as HINTS only, not verified facts. If you reuse a finding from prior_knowledge, you MUST cite the prior session/dream via its slug or run_id in your `findings[].sources[]` or in a `failures[]` note. Do not blindly copy prior findings — fresh sources still take priority. If prior_knowledge is empty `{similar_sessions:[],dream_insights:[]}`, proceed normally.
+
+lens_hints (when present) lists perspective-specific questions and search queries from the session lens plan. Treat them as OPTIONAL coverage hints to widen which sources you pull and which sub-claims you check — you remain a source-oriented adapter and MUST NOT fabricate findings to satisfy a lens. If lens_hints is absent, proceed exactly as before.
 
 Return a single fenced JSON block per lib/adapter_contract.md. Do not include anything after the JSON block.
 ```
 
 Timeout per adapter: 5 minutes — except youtube-adapter: 20 minutes (AV-first media download + Whisper transcription scale with video length; no length cap per spec). Configured implicitly by the agent runtime; do NOT actively retry beyond the single dispatch. If an adapter returns non-JSON or malformed JSON, record it as a failure and continue.
+
+### Stage 4.6 — Claim Review (optional, gated)
+
+Central contradiction / evidence-reliability / missing-lens review over the merged adapter findings, BEFORE the README is synthesized, so the report can demote or correct over-broad claims and name missing perspectives.
+
+1. After adapters return, compute the final 1-indexed source list and count (`source_count`). Read whether a lens plan was generated (`lens_generated = true` iff `<report_dir>/lens_plan.json` exists with `generated:true`, else `false`).
+2. Decide the gate:
+   ```bash
+   GATE=$(bash "${CLAUDE_PLUGIN_ROOT}/scripts/claim_review_gate.sh" "<source_count>" "<lens_generated>" "<--review|--no-review|>")
+   ```
+3. If `gate == off`: skip — do not create `claim_review.json`. Log `claim review skipped (<reason>)`. Proceed to Stage 5.
+4. If `gate == on`: dispatch the `claim-reviewer` subagent with a single Agent call. Inputs: `{slug, sources, findings, intent, lens_plan?}`. It returns one fenced JSON block per `tests/research-engine/schemas/claim_review.schema.json`.
+5. Write to `<report_dir>/claim_review.json`, stamping `created`. Validate:
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/lib/claim_review_validator.mjs" "<report_dir>/claim_review.json"   # exit 0 + "OK"
+   ```
+   On validation failure: log, delete the file, continue as if off. Never abort the run.
+6. Stage 5 consumes `claim_review.json` for the optional `## 검증 매트릭스` and `## 누락 관점 / 후속 질문` sections, and MUST drop or soften any claim whose `citation_status` is `unsupported`/`contradicted` (apply `corrected_text` when present).
 
 ### Stage 5 — Synthesize & Persist
 
@@ -143,6 +182,8 @@ Timeout per adapter: 5 minutes — except youtube-adapter: 20 minutes (AV-first 
    - For `arxiv` / `huggingface` (academic) inputs: `상세 분석` (§4) MUST be sub-divided into `### 방법론 / 핵심 메커니즘`, `### 실험 결과 / 벤치마크`, `### 저자 한계 / 미해결` — at least 2 fine-grained findings per sub-heading. Do NOT collapse method details, ablations, zero-shot evaluations, or related-work taxonomy into single bullets even when they share a parent topic. The granularity IS the depth signal for academic content.
    - For `youtube` / `blog` / `community`: standard merge-by-topic dedup.
    - For `github` / `context7` (code/docs): keep separate sub-headings for code structure, activity signals, and usage patterns when each has 2+ findings.
+
+   If `<report_dir>/claim_review.json` exists, apply its corrections during synthesis (drop `unsupported` claims, replace over-broad claims with `corrected_text`), then render the optional `## 검증 매트릭스` and `## 누락 관점 / 후속 질문` sections per `lib/report_sections.md`. If the file is absent, skip both sections (no-op).
 4. YouTube only: write `<report_dir>/transcript.md` from the youtube-adapter `artifacts.transcript_md`.
 5. For each unique `related[]` entry, write `<report_dir>/related/<kind>-<slug>.md` with a one-paragraph summary + URL. Deduplicate by URL.
 6. If any adapter had non-empty `failures[]`, include the `## 수집 실패 (Failures)` section in README.md.
