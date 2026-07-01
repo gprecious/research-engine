@@ -9,6 +9,10 @@ setup() {
   export REPO_ROOT TMP_HOME
 }
 
+mtime() {
+  stat -c %Y "$1" 2>/dev/null || stat -f %m "$1"
+}
+
 teardown() {
   rm -rf "${TMP_HOME}"
 }
@@ -45,10 +49,10 @@ teardown() {
 
 @test "memory_reindex: 기존 세션 파일 mtime 불변" {
   cd "${TMP_HOME}"
-  before=$(stat -c %Y "${TMP_HOME}/research/2026-05-01-fixture-a/sources.json")
+  before=$(mtime "${TMP_HOME}/research/2026-05-01-fixture-a/sources.json")
   sleep 1
   bash "${REPO_ROOT}/scripts/memory_reindex.sh"
-  after=$(stat -c %Y "${TMP_HOME}/research/2026-05-01-fixture-a/sources.json")
+  after=$(mtime "${TMP_HOME}/research/2026-05-01-fixture-a/sources.json")
   [ "$before" = "$after" ]
 }
 

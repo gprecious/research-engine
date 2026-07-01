@@ -53,6 +53,13 @@ pnpm test:e2e          # playwright — RED until app running
 JUDGE_SMOKE=1 pnpm test:unit -- judge_app   # real judge via claude -p
 ```
 
+### Lens plan + claim review tests
+
+- vitest: `lib/lens_plan_validator.test.mjs`, `lib/claim_review_validator.test.mjs` (run via `pnpm test:unit`)
+- bats: `tests/research-engine/lens_gate.test.sh`, `claim_review_gate.test.sh`, `lens-claim-agents.test.sh`, `lens-claim-pipeline.test.sh`, `evolve-lens-claim.test.sh`
+
+Run all: `pnpm test:unit && pnpm test:bats`
+
 ## Adapter contract
 
 All adapters return the JSON specified in `lib/adapter_contract.md`. The orchestrator (`commands/research.md`) merges these into the report.

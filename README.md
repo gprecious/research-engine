@@ -83,6 +83,8 @@ Tip: once installed, replace the snapshot in `~/.claude/plugins/cache/research-e
 
 Output lands in `research/YYYY-MM-DD-<slug>/README.md`. When Notion is configured, a consolidated report is also upserted as a row in a `research-engine` database under the configured parent page (one row per session, re-runs update in place).
 
+`/research` has two optional evidence-widening layers. Stage 3.5 lens planning runs for topic or weak-preview inputs, or when forced with `--lens`, and writes `lens_plan.json` so adapters receive perspective-specific questions and search queries as hints only; `--no-lens` disables it. Stage 4.6 claim review can be forced with `--review` / `--no-review`, checks gathered claims before synthesis, and feeds the optional `## 검증 매트릭스` and `## 누락 관점 / 후속 질문` report sections. When either gate is off or an artifact is absent, the pipeline keeps the existing narrow-run shape.
+
 ### AI agent instructions
 
 Agents that cannot execute Claude Code slash commands should use `skills/research-engine/SKILL.md` as the entrypoint and treat the command files as the canonical pipeline reference:

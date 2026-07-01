@@ -38,7 +38,7 @@ teardown() {
 
 @test "dream e2e: status active → discarded 편집 후 reindex → memory_query에서 제외" {
   cd "${TMP_HOME}"
-  sed -i 's/status: "active"/status: "discarded"/' "${TMP_HOME}/docs/dreams/drm_active-fixture/README.md"
+  perl -0pi -e 's/status: "active"/status: "discarded"/' "${TMP_HOME}/docs/dreams/drm_active-fixture/README.md"
   bash "${REPO_ROOT}/scripts/memory_reindex.sh"
 
   TARGET='{"input_type":"arxiv","topics":[],"intent":{"purpose":"x"}}'
